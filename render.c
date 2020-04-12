@@ -816,7 +816,7 @@ render_worker_thread(void *_ctx)
     if (prctl(PR_SET_NAME, proc_title, 0, 0, 0) < 0)
         LOG_ERRNO("render worker %d: failed to set process title", my_id);
 #elif __FreeBSD__
-    setproctitle(proc_title);
+    setproctitle("%s", proc_title);
 #endif
 
 
