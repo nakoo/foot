@@ -5,7 +5,12 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/timerfd.h>
+#if __linux__
 #include <sys/prctl.h>
+#elif __FreeBSD__
+#include <sys/types.h>
+#include <unistd.h>
+#endif
 
 #include <wayland-cursor.h>
 #include <xdg-shell.h>
