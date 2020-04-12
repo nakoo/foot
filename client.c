@@ -10,7 +10,11 @@
 #include <errno.h>
 
 #include <sys/socket.h>
+#if __linux__
 #include <linux/un.h>
+#elif __FreeBSD__
+#include <sys/un.h>
+#endif
 
 #define LOG_MODULE "foot-client"
 #define LOG_ENABLE_DBG 0

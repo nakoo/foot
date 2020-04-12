@@ -807,8 +807,13 @@ render_worker_thread(void *_ctx)
     char proc_title[16];
     snprintf(proc_title, sizeof(proc_title), "foot:render:%d", my_id);
 
+#if __linux__
     if (prctl(PR_SET_NAME, proc_title, 0, 0, 0) < 0)
         LOG_ERRNO("render worker %d: failed to set process title", my_id);
+#elif __FreeBSD__
+    setproctitle(proc_title);
+#endif
+
 
     sem_t *start = &term->render.workers.start;
     sem_t *done = &term->render.workers.done;

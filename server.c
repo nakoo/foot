@@ -8,7 +8,11 @@
 #include <sys/socket.h>
 #include <sys/epoll.h>
 
+#if __linux__
 #include <linux/un.h>
+#elif __FreeBSD__
+#include <sys/un.h>
+#endif
 
 #include <tllist.h>
 

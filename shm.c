@@ -10,8 +10,10 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#if __linux__
 #include <linux/mman.h>
 #include <linux/memfd.h>
+#endif
 #include <fcntl.h>
 
 #include <pixman.h>

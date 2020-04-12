@@ -1,6 +1,11 @@
 #include "terminal.h"
 
+#if __linux__
 #include <malloc.h>
+#elif __FreeBSD__
+#include <stdlib.h>
+#include <signal.h>
+#endif
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>

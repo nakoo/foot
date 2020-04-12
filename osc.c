@@ -327,7 +327,11 @@ osc_set_pwd(struct terminal *term, char *string)
     if (hostname_end == NULL)
         return;
 
+#if __linux__
     char this_host[HOST_NAME_MAX];
+#elif __FreeBSD__
+    char this_host[sysconf(_SC_HOST_NAME_MAX)];
+#endif
     if (gethostname(this_host, sizeof(this_host)) < 0)
         this_host[0] = '\0';
 
