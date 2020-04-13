@@ -53,7 +53,9 @@ static off_t max_pool_size = 512 * 1024 * 1024;
 static tll(struct buffer) buffers;
 
 static bool can_punch_hole = false;
+#ifdef __linux__
 static bool can_punch_hole_initialized = false;
+#endif
 
 #undef MEASURE_SHM_ALLOCS
 #if defined(MEASURE_SHM_ALLOCS)
@@ -278,6 +280,7 @@ shm_get_buffer(struct wl_shm *shm, int width, int height, unsigned long cookie, 
         goto err;
     }
 
+#ifdef __linux__
     if (!can_punch_hole_initialized) {
         can_punch_hole_initialized = true;
         can_punch_hole = fallocate(
@@ -289,6 +292,9 @@ shm_get_buffer(struct wl_shm *shm, int width, int height, unsigned long cookie, 
                 "supported (%s): expect lower performance", strerror(errno));
         }
     }
+#elif __FreeBSD__
+    can_punch_hole = false;
+#endif
 
     if (scrollable && !can_punch_hole) {
         initial_offset = 0;
@@ -384,6 +390,7 @@ shm_can_scroll(const struct buffer *buf)
 #endif
 }
 
+#ifdef __linux__
 static bool
 wrap_buffer(struct wl_shm *shm, struct buffer *buf, off_t new_offset)
 {
@@ -418,7 +425,9 @@ wrap_buffer(struct wl_shm *shm, struct buffer *buf, off_t new_offset)
     buffer_destroy_dont_close(buf);
     return instantiate_offset(shm, buf, new_offset);
 }
+#endif
 
+#ifdef __linux__
 static bool
 shm_scroll_forward(struct wl_shm *shm, struct buffer *buf, int rows,
                    int top_margin, int top_keep_rows,
@@ -522,7 +531,9 @@ err:
     abort();
     return false;
 }
+#endif
 
+#ifdef __linux__
 static bool
 shm_scroll_reverse(struct wl_shm *shm, struct buffer *buf, int rows,
                    int top_margin, int top_keep_rows,
@@ -616,12 +627,16 @@ err:
     abort();
     return false;
 }
+#endif
 
 bool
 shm_scroll(struct wl_shm *shm, struct buffer *buf, int rows,
            int top_margin, int top_keep_rows,
            int bottom_margin, int bottom_keep_rows)
 {
+#ifdef __FreeBSD__
+  return false;
+#elif __linux__
     if (!shm_can_scroll(buf))
         return false;
 
@@ -629,6 +644,7 @@ shm_scroll(struct wl_shm *shm, struct buffer *buf, int rows,
     return rows > 0
         ? shm_scroll_forward(shm, buf, rows, top_margin, top_keep_rows, bottom_margin, bottom_keep_rows)
         : shm_scroll_reverse(shm, buf, -rows, top_margin, top_keep_rows, bottom_margin, bottom_keep_rows);
+#endif
 }
 
     void
