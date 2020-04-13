@@ -309,7 +309,12 @@ shm_get_buffer(struct wl_shm *shm, int width, int height, unsigned long cookie, 
 
     real_mmapped = mmap(
         NULL, memfd_size, PROT_READ | PROT_WRITE,
-        MAP_SHARED | MAP_UNINITIALIZED, pool_fd, 0);
+#ifdef __linux__
+        MAP_SHARED | MAP_UNINITIALIZED,
+#else
+        MAP_SHARED,
+#endif
+        pool_fd, 0);
 
     if (real_mmapped == MAP_FAILED) {
         LOG_ERRNO("failed to mmap SHM backing memory file");
