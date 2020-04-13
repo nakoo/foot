@@ -56,6 +56,8 @@ wayland_protocols = dependency('wayland-protocols')
 wayland_client = dependency('wayland-client')
 wayland_cursor = dependency('wayland-cursor')
 xkb = dependency('xkbcommon')
+epoll_shim = dependency('epoll-shim', required: host_machine.system() == 'freebsd')
+stdthreads = cc.find_library('stdthreads', required: host_machine.system() == 'freebsd')
 
 add_project_arguments('-DFOOT_UNICODE_PRECOMPOSE=@0@'.format(
   get_option('unicode-precompose')), language: 'c')
@@ -139,7 +141,8 @@ executable(
   'vt.c', 'vt.h',
   'wayland.c', 'wayland.h',
   wl_proto_src + wl_proto_headers, version, unicode_data,
-  dependencies: [math, threads, pixman, wayland_client, wayland_cursor, xkb, tllist, fcft],
+  dependencies: [math, threads, pixman, wayland_client, wayland_cursor, xkb, epoll_shim, stdthreads,
+                tllist, fcft],
   install: true)
 
 executable(
