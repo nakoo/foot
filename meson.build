@@ -151,17 +151,10 @@ executable(
   'log.c', 'log.h', version,
   install: true)
 
-custom_target(
-  'terminfo',
-  output: 'f',
-  input: 'foot.info',
-  command: ['tic', '-x', '-o', '@OUTDIR@', '-e', 'foot,foot-direct', '@INPUT@'],
-  install: true,
-  install_dir: join_paths(get_option('datadir'), 'terminfo'))
-
 install_data('foot.desktop', 'foot-server.desktop', install_dir: join_paths(get_option('datadir'), 'applications'))
-install_data('footrc', install_dir: join_paths(get_option('datadir'), 'foot'))
+install_data('footrc')
 
+subdir('terminfo')
 subdir('completions')
 subdir('doc')
 
