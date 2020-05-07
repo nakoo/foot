@@ -8,6 +8,7 @@
 #include <fcntl.h>
 
 #include <sys/epoll.h>
+#include <sys/timerfd.h>
 
 #include <tllist.h>
 
