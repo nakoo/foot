@@ -53,9 +53,7 @@ static off_t max_pool_size = 512 * 1024 * 1024;
 static tll(struct buffer) buffers;
 
 static bool can_punch_hole = false;
-#ifdef __linux__
 static bool can_punch_hole_initialized = false;
-#endif
 
 #undef MEASURE_SHM_ALLOCS
 #if defined(MEASURE_SHM_ALLOCS)
@@ -280,9 +278,11 @@ shm_get_buffer(struct wl_shm *shm, int width, int height, unsigned long cookie, 
         goto err;
     }
 
-#ifdef __linux__
     if (!can_punch_hole_initialized) {
         can_punch_hole_initialized = true;
+#ifdef __FreeBSD__
+        can_punch_hole = false;
+#else
         can_punch_hole = fallocate(
             pool_fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, 0, 1) == 0;
 
@@ -291,10 +291,8 @@ shm_get_buffer(struct wl_shm *shm, int width, int height, unsigned long cookie, 
                 "fallocate(FALLOC_FL_PUNCH_HOLE) not "
                 "supported (%s): expect lower performance", strerror(errno));
         }
-    }
-#elif __FreeBSD__
-    can_punch_hole = false;
 #endif
+    }
 
     if (scrollable && !can_punch_hole) {
         initial_offset = 0;
@@ -395,7 +393,7 @@ shm_can_scroll(const struct buffer *buf)
 #endif
 }
 
-#ifdef __linux__
+#ifndef __FreeBSD__
 static bool
 wrap_buffer(struct wl_shm *shm, struct buffer *buf, off_t new_offset)
 {
@@ -432,7 +430,7 @@ wrap_buffer(struct wl_shm *shm, struct buffer *buf, off_t new_offset)
 }
 #endif
 
-#ifdef __linux__
+#ifndef __FreeBSD__
 static bool
 shm_scroll_forward(struct wl_shm *shm, struct buffer *buf, int rows,
                    int top_margin, int top_keep_rows,
@@ -538,7 +536,7 @@ err:
 }
 #endif
 
-#ifdef __linux__
+#ifndef __FreeBSD__
 static bool
 shm_scroll_reverse(struct wl_shm *shm, struct buffer *buf, int rows,
                    int top_margin, int top_keep_rows,
@@ -641,7 +639,7 @@ shm_scroll(struct wl_shm *shm, struct buffer *buf, int rows,
 {
 #ifdef __FreeBSD__
   return false;
-#elif __linux__
+#else
     if (!shm_can_scroll(buf))
         return false;
 

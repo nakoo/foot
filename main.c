@@ -10,11 +10,7 @@
 #include <unistd.h>
 
 #include <sys/types.h>
-#if __linux__
-#include <sys/sysinfo.h>
-#elif __FreeBSD__
 #include <sys/stat.h>
-#endif
 #include <fcntl.h>
 
 #include <fcft/fcft.h>

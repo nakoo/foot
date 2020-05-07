@@ -10,6 +10,7 @@
 #include <signal.h>
 
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 
 #define LOG_MODULE "slave"
@@ -90,6 +91,11 @@ slave_exec(int ptmx, char *argv[], int err_fd, bool login_shell)
     pts = open(pts_name, O_RDWR);
     if (pts == -1) {
         LOG_ERRNO("failed to open pseudo terminal slave device");
+        goto err;
+    }
+
+        if (ioctl(pts, TIOCSCTTY, 0) < 0) {
+        LOG_ERRNO("failed to configure controlling terminal");
         goto err;
     }
 

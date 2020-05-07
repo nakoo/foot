@@ -98,7 +98,7 @@ bool
 fdm_add(struct fdm *fdm, int fd, int events, fdm_handler_t handler, void *data)
 {
 #if defined(_DEBUG)
-#ifdef __FreeBSD__
+#ifndef __FreeBSD__
     int flags = fcntl(fd, F_GETFL);
     if (!(flags & O_NONBLOCK)) {
         LOG_ERR("FD=%d is in blocking mode", fd);
