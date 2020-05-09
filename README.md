@@ -22,6 +22,7 @@ The fast, lightweight and minimalistic Wayland terminal emulator.
    1. [Building](#building)
 1. [Installing](#installing)
    1. [Arch Linux](#arch-linux)
+   1. [FreeBSD](#freebsd)
    1. [Other](#other)
 1. [Bugs](#bugs)
 
@@ -358,6 +359,17 @@ Note that it will do a profiling-guided build, and that this requires
 a running wayland session since it needs to run an intermediate build
 of foot.
 
+### FreeBSD
+
+Install from packages:
+```sh
+pkg install foot
+```
+
+Install from ports:
+```sh
+make -C /usr/ports/x11/foot build install
+```
 
 ### Other
 
