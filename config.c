@@ -657,6 +657,18 @@ parse_section_tweak(
                  conf->tweak.max_shm_pool_size);
     }
 
+    else if (strcmp(key, "pty-prefetch-buffer-size-kb") == 0) {
+        unsigned long kb;
+        if (!str_to_ulong(value, 10, &kb)) {
+            LOG_ERR("%s:%d: expected an integer: %s", path, lineno, value);
+            return false;
+        }
+
+        conf->tweak.pty_prefetch_size = min(kb * 1024, UINT32_MAX);
+        LOG_WARN("tweak: pty-prefetch-buffer-size=%u bytes",
+                 conf->tweak.pty_prefetch_size);
+    }
+
     else {
         LOG_ERR("%s:%u: invalid key: %s", path, lineno, key);
         return false;
@@ -930,6 +942,7 @@ config_load(struct config *conf, const char *conf_path)
             .delayed_render_lower_ns = 500000,         /* 0.5ms */
             .delayed_render_upper_ns = 16666666 / 2,   /* half a frame period (60Hz) */
             .max_shm_pool_size = 512 * 1024 * 1024,
+            .pty_prefetch_size = 512 * 1024,
         },
     };
 

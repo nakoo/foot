@@ -215,12 +215,12 @@ struct terminal {
         mtx_t lock;
         cnd_t cond;
         int event_fd;
-        int size;
+        unsigned size;
 
         uint8_t idx;
         struct {
             uint8_t *data;
-            int len;
+            unsigned len;
         } buf[2];
     } ptmx_read_buffer;
 

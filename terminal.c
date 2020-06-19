@@ -317,12 +317,6 @@ ptmx_reader_thread(void *_term)
                     amount = term->ptmx_read_buffer.size - len;
                 }
 
-                /* TODO */
-                if (amount == 0) {
-                    LOG_ERR("PTY read buffer full");
-                    abort();
-                }
-
                 ssize_t count = read(term->ptmx, &buf[len], amount);
                 if (count < 0) {
                     LOG_ERRNO("failed to read from PTY");
@@ -904,10 +898,10 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         .ptmx_read_buffer = {
             .event_fd = ptmx_event_fd,
             .idx = 0,
-            .size = 4 * 1024 * 1024,
+            .size = conf->tweak.pty_prefetch_size,
             .buf = {
-                {.data = malloc(4 * 1024 * 1024), .len = 0},
-                {.data = malloc(4 * 1024 * 1024), .len = 0},
+                {.data = malloc(conf->tweak.pty_prefetch_size), .len = 0},
+                {.data = malloc(conf->tweak.pty_prefetch_size), .len = 0},
             },
         },
         .ptmx_buffer = tll_init(),
