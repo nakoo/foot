@@ -1289,13 +1289,16 @@ term_destroy(struct terminal *term)
     tll_free(term->render.workers.queue);
 
     /* Make sure we wake up the reader thread if it is blocking on a full buffer */
-    mtx_lock(&term->ptmx_read_buffer.lock);
-    term->ptmx_read_buffer.buf[0].len = 0;
-    term->ptmx_read_buffer.buf[1].len = 0;
-    cnd_signal(&term->ptmx_read_buffer.cond);
-    mtx_unlock(&term->ptmx_read_buffer.lock);
+    if (term->ptmx_read_buffer.thread_id != 0) {
+        mtx_lock(&term->ptmx_read_buffer.lock);
+        term->ptmx_read_buffer.buf[0].len = 0;
+        term->ptmx_read_buffer.buf[1].len = 0;
+        cnd_signal(&term->ptmx_read_buffer.cond);
+        mtx_unlock(&term->ptmx_read_buffer.lock);
 
-    thrd_join(term->ptmx_read_buffer.thread_id, NULL);
+        thrd_join(term->ptmx_read_buffer.thread_id, NULL);
+    }
+
     cnd_destroy(&term->ptmx_read_buffer.cond);
     mtx_destroy(&term->ptmx_read_buffer.lock);
     free(term->ptmx_read_buffer.buf[0].data);
