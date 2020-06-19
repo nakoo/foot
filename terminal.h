@@ -210,6 +210,20 @@ struct terminal {
 
     pid_t slave;
     int ptmx;
+    struct {
+        thrd_t thread_id;
+        mtx_t lock;
+        cnd_t cond;
+        int event_fd;
+        int size;
+
+        uint8_t idx;
+        struct {
+            uint8_t *data;
+            int len;
+        } buf[2];
+    } ptmx_read_buffer;
+
     bool quit;
 
     struct grid normal;
@@ -226,6 +240,7 @@ struct terminal {
     int font_adjustments;
     enum fcft_subpixel font_subpixel;
 
+    /* TODO: rename to ptmx_write_buffer? */
     tll(struct ptmx_buffer) ptmx_buffer;
 
     enum cursor_keys cursor_keys_mode;

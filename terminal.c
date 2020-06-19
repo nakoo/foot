@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <errno.h>
+#include <poll.h>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -136,39 +137,70 @@ fdm_ptmx(struct fdm *fdm, int fd, int events, void *data)
 {
     struct terminal *term = data;
 
-    const bool pollin = events & EPOLLIN;
+    const bool pollin __attribute__((unused)) = events & EPOLLIN;
     const bool pollout = events & EPOLLOUT;
     const bool hup = events & EPOLLHUP;
+
+    assert(!pollin);
 
     if (pollout) {
         if (!fdm_ptmx_out(fdm, fd, events, data))
             return false;
     }
 
+    if (hup) {
+        if (term->hold_at_exit) {
+            fdm_del(fdm, fd);
+            term->ptmx = -1;
+            return true;
+        } else
+            return term_shutdown(term);
+    }
+    return true;
+}
+
+static bool
+fdm_ptmx_read(struct fdm *fdm, int fd, int events, void *data)
+{
+    struct terminal *term = data;
+
+    const bool pollin __attribute__((unused)) = events & EPOLLIN;
+    const bool hup = events & EPOLLHUP;
+
+    if (hup) {
+        assert(false);
+        return false;
+    }
+
+    uint8_t idx;
+
+    assert(pollin);
+    mtx_lock(&term->ptmx_read_buffer.lock);
+    {
+        uint64_t value;
+        ssize_t count = read(term->ptmx_read_buffer.event_fd, &value, sizeof(value));
+        if (count < 0) {
+            LOG_ERRNO("failed to read from event FD");
+            return false;
+        }
+
+        idx = term->ptmx_read_buffer.idx;
+        term->ptmx_read_buffer.idx = 1 - idx;
+        term->ptmx_read_buffer.buf[1 - idx].len = 0;
+        cnd_signal(&term->ptmx_read_buffer.cond);
+    }
+    mtx_unlock(&term->ptmx_read_buffer.lock);
+
     /* Prevent blinking while typing */
     term_cursor_blink_restart(term);
 
     term->render.app_sync_updates.flipped = false;
 
-    uint8_t buf[24 * 1024];
-    ssize_t count = sizeof(buf);
+    const uint8_t *buf = term->ptmx_read_buffer.buf[idx].data;
+    const size_t count = term->ptmx_read_buffer.buf[idx].len;
 
-    const size_t max_iterations = 10;
-
-    for (size_t i = 0; i < max_iterations && pollin && count == sizeof(buf); i++) {
-        assert(pollin);
-        count = read(term->ptmx, buf, sizeof(buf));
-
-        if (count < 0) {
-            if (errno == EAGAIN)
-                return true;
-
-            LOG_ERRNO("failed to read from pseudo terminal");
-            return false;
-        }
-
-        vt_from_slave(term, buf, count);
-    }
+    LOG_INFO("processing %zu PTY bytes", count);
+    vt_from_slave(term, buf, count);
 
     if (!term->render.app_sync_updates.enabled &&
         !term->render.app_sync_updates.flipped)
@@ -241,15 +273,76 @@ fdm_ptmx(struct fdm *fdm, int fd, int events, void *data)
             render_refresh(term);
     }
 
-    if (hup) {
-        if (term->hold_at_exit) {
-            fdm_del(fdm, fd);
-            term->ptmx = -1;
-            return true;
-        } else
-            return term_shutdown(term);
-    }
+    if (hup)
+        return false;
+
     return true;
+}
+
+static int
+ptmx_reader_thread(void *_term)
+{
+    struct terminal *term = _term;
+
+    assert(term->ptmx >= 0);
+
+    while (true) {
+        struct pollfd fds[] = {{.fd = term->ptmx, .events = POLLIN}};
+        int r = poll(fds, sizeof(fds) / sizeof(fds[0]), -1);
+
+        if (r < 0) {
+            if (errno == EINTR)
+                continue;
+            LOG_ERRNO("failed to poll PTY");
+            close(term->ptmx);
+            return -1;
+        }
+
+        assert(r == 1);
+
+
+        if (fds[0].revents & POLLIN) {
+            mtx_lock(&term->ptmx_read_buffer.lock);
+            {
+                uint8_t idx = term->ptmx_read_buffer.idx;
+                uint8_t *buf = term->ptmx_read_buffer.buf[idx].data;
+                int len = term->ptmx_read_buffer.buf[idx].len;
+                size_t amount = term->ptmx_read_buffer.size - len;
+
+                while (amount == 0) {
+                    cnd_wait(&term->ptmx_read_buffer.cond, &term->ptmx_read_buffer.lock);
+                    idx = term->ptmx_read_buffer.idx;
+                    buf = term->ptmx_read_buffer.buf[idx].data;
+                    len = term->ptmx_read_buffer.buf[idx].len;
+                    amount = term->ptmx_read_buffer.size - len;
+                }
+
+                /* TODO */
+                if (amount == 0) {
+                    LOG_ERR("PTY read buffer full");
+                    abort();
+                }
+
+                ssize_t count = read(term->ptmx, &buf[len], amount);
+                if (count < 0) {
+                    LOG_ERRNO("failed to read from PTY");
+                    return -1;
+                }
+
+                term->ptmx_read_buffer.buf[idx].len += count;
+                if (write(term->ptmx_read_buffer.event_fd, &(uint64_t){1}, sizeof(uint64_t)) < 0) {
+                    LOG_ERRNO("failed to write to event FD");
+                    return -1;
+                }
+            }
+            mtx_unlock(&term->ptmx_read_buffer.lock);
+        }
+
+        if (fds[0].revents & POLLHUP) {
+            LOG_INFO("QUITTING");
+            return 0;
+        }
+    }
 }
 
 static bool
@@ -724,6 +817,7 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
           int argc, char *const *argv,
           void (*shutdown_cb)(void *data, int exit_code), void *shutdown_data)
 {
+    int ptmx_event_fd = -1;
     int ptmx = -1;
     int flash_fd = -1;
     int blink_fd = -1;
@@ -733,6 +827,11 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
     int app_sync_updates_fd = -1;
 
     struct terminal *term = malloc(sizeof(*term));
+
+    if ((ptmx_event_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK)) < 0) {
+        LOG_ERRNO("failed to create PTY event FDs");
+        goto close_fds;
+    }
 
     if ((ptmx = posix_openpt(O_RDWR | O_NOCTTY)) == -1) {
         LOG_ERRNO("failed to open PTY");
@@ -784,7 +883,8 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
      * size (and thus no grid) before then.
      */
 
-    if (!fdm_add(fdm, flash_fd, EPOLLIN, &fdm_flash, term) ||
+    if (!fdm_add(fdm, ptmx_event_fd, EPOLLIN, &fdm_ptmx_read, term) ||
+        !fdm_add(fdm, flash_fd, EPOLLIN, &fdm_flash, term) ||
         !fdm_add(fdm, blink_fd, EPOLLIN, &fdm_blink, term) ||
         !fdm_add(fdm, cursor_blink_fd, EPOLLIN, &fdm_cursor_blink, term) ||
         !fdm_add(fdm, delay_lower_fd, EPOLLIN, &fdm_delayed_render, term) ||
@@ -801,6 +901,15 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         .conf = conf,
         .quit = false,
         .ptmx = ptmx,
+        .ptmx_read_buffer = {
+            .event_fd = ptmx_event_fd,
+            .idx = 0,
+            .size = 4 * 1024 * 1024,
+            .buf = {
+                {.data = malloc(4 * 1024 * 1024), .len = 0},
+                {.data = malloc(4 * 1024 * 1024), .len = 0},
+            },
+        },
         .ptmx_buffer = tll_init(),
         .font_dpi = 0,
         .font_adjustments = 0,
@@ -907,6 +1016,15 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         goto err;
     }
 
+    if (mtx_init(&term->ptmx_read_buffer.lock, mtx_plain) != thrd_success) {
+        LOG_ERRNO("failed to initialize PTY read lock");
+        goto err;
+    }
+    if (cnd_init(&term->ptmx_read_buffer.cond) != thrd_success) {
+        LOG_ERRNO("failed to initialize PTY read condition variable");
+        goto err;
+    }
+
     /* Guess scale; we're not mapped yet, so we don't know on which
      * output we'll be. Pick highest scale we find for now */
     tll_foreach(term->wl->monitors, it) {
@@ -956,6 +1074,7 @@ err:
 
 close_fds:
     close(ptmx);
+    fdm_del(fdm, ptmx_event_fd);
     fdm_del(fdm, flash_fd);
     fdm_del(fdm, blink_fd);
     fdm_del(fdm, cursor_blink_fd);
@@ -973,7 +1092,13 @@ term_window_configured(struct terminal *term)
     /* Enable ptmx FDM callback */
     if (!term->is_shutting_down) {
         assert(term->window->is_configured);
-        fdm_add(term->fdm, term->ptmx, EPOLLIN, &fdm_ptmx, term);
+        fdm_add(term->fdm, term->ptmx, 0, &fdm_ptmx, term);
+
+        int ret = thrd_create(&term->ptmx_read_buffer.thread_id, &ptmx_reader_thread, term);
+
+        /* TODO */
+        if (ret != thrd_success)
+            LOG_ERRNO("failed to create PTY reader thread");
     }
 }
 
@@ -1039,6 +1164,7 @@ term_shutdown(struct terminal *term)
     fdm_del(term->fdm, term->blink.fd);
     fdm_del(term->fdm, term->flash.fd);
 
+    fdm_del(term->fdm, term->ptmx_read_buffer.event_fd);
     if (term->window != NULL && term->window->is_configured)
         fdm_del(term->fdm, term->ptmx);
     else
@@ -1051,6 +1177,7 @@ term_shutdown(struct terminal *term)
     term->blink.fd = -1;
     term->flash.fd = -1;
     term->ptmx = -1;
+    term->ptmx_read_buffer.event_fd = -1;
 
     int event_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
     if (event_fd == -1) {
@@ -1094,6 +1221,7 @@ term_destroy(struct terminal *term)
         }
     }
 
+    fdm_del(term->fdm, term->ptmx_read_buffer.event_fd);
     fdm_del(term->fdm, term->render.app_sync_updates.timer_fd);
     fdm_del(term->fdm, term->delayed_render_timer.lower_fd);
     fdm_del(term->fdm, term->delayed_render_timer.upper_fd);
@@ -1160,6 +1288,19 @@ term_destroy(struct terminal *term)
     assert(tll_length(term->render.workers.queue) == 0);
     tll_free(term->render.workers.queue);
 
+    /* Make sure we wake up the reader thread if it is blocking on a full buffer */
+    mtx_lock(&term->ptmx_read_buffer.lock);
+    term->ptmx_read_buffer.buf[0].len = 0;
+    term->ptmx_read_buffer.buf[1].len = 0;
+    cnd_signal(&term->ptmx_read_buffer.cond);
+    mtx_unlock(&term->ptmx_read_buffer.lock);
+
+    thrd_join(term->ptmx_read_buffer.thread_id, NULL);
+    cnd_destroy(&term->ptmx_read_buffer.cond);
+    mtx_destroy(&term->ptmx_read_buffer.lock);
+    free(term->ptmx_read_buffer.buf[0].data);
+    free(term->ptmx_read_buffer.buf[1].data);
+
     tll_foreach(term->ptmx_buffer, it)
         free(it->item.data);
     tll_free(term->ptmx_buffer);
@@ -1175,6 +1316,7 @@ term_destroy(struct terminal *term)
 
     free(term->foot_exe);
     free(term->cwd);
+
 
     int ret = EXIT_SUCCESS;
 
