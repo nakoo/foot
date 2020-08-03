@@ -19,6 +19,7 @@
 # color=111111 dcdccc
 # blink=no
 # hide-when-typing=no
+# indicate-when-selecting=yes
 
 [colors]
 # alpha=1.0

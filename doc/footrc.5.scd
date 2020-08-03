@@ -109,6 +109,10 @@ applications can change these at runtime.
 *hide-when-typing*
 	Boolean. When enabled, the mouse cursor is hidden while typing.
 
+*indicate-when-selecting*
+	Boolean. When enabled, the mouse cursor changes form to indicate
+	when the Shift key is held (for text selections).
+
 *color*
 	Two RRGGBB values specifying the foreground (text) and background
 	(cursor) colors for the cursor. Default: inversed foreground and

@@ -75,6 +75,7 @@ struct config {
         enum cursor_style style;
         bool blink;
         bool hide_when_typing;
+        bool indicate_when_selecting;
         struct {
             uint32_t text;
             uint32_t cursor;
