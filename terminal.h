@@ -310,6 +310,7 @@ struct terminal {
         enum selection_direction direction;
         struct coord start;
         struct coord end;
+        bool ongoing;
     } selection;
 
     bool is_searching;
