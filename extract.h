@@ -7,7 +7,8 @@
 
 struct extraction_context;
 
-struct extraction_context *extract_begin(enum selection_kind kind);
+struct extraction_context *extract_begin(
+    enum selection_kind kind, bool trim_trailing_spaces);
 
 bool extract_one(
     const struct terminal *term, const struct row *row, const struct cell *cell,

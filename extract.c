@@ -15,10 +15,11 @@ struct extraction_context {
     const struct row *last_row;
     const struct cell *last_cell;
     enum selection_kind selection_kind;
+    bool trim_trailing_spaces;
 };
 
 struct extraction_context *
-extract_begin(enum selection_kind kind)
+extract_begin(enum selection_kind kind, bool trim_trailing_spaces)
 {
     struct extraction_context *ctx = malloc(sizeof(*ctx));
     if (unlikely(ctx == NULL)) {
@@ -28,6 +29,7 @@ extract_begin(enum selection_kind kind)
 
     *ctx = (struct extraction_context){
         .selection_kind = kind,
+        .trim_trailing_spaces = trim_trailing_spaces,
     };
     return ctx;
 }
@@ -143,7 +145,7 @@ extract_one(const struct terminal *term, const struct row *row,
         }
     }
 
-    if (cell->wc == 0) {
+    if (cell->wc == 0 || (ctx->trim_trailing_spaces && cell->wc == L' ')) {
         ctx->empty_count++;
         ctx->last_row = row;
         ctx->last_cell = cell;

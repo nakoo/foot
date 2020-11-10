@@ -58,6 +58,8 @@
 
 * Blinking text now uses the foreground color, but dimmed down in its
   off state, instead of the background color.
+* Trailing spaces are trimmed when copying a block selection
+  (https://codeberg.org/dnkl/foot/issues/181).
 
 
 ### Deprecated
