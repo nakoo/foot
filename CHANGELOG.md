@@ -52,14 +52,15 @@
   bindings. By default, they are bound to `ctrl+v ctrl+y` and
   `shift+insert` respectively, and lets you paste from the clipboard
   or primary selection into the search buffer.
+* **trim-trailing-spaces-from-selection** option to `foot.init`. When
+  enabled, trailing spaces are trimmed from both regular and block
+  selections (https://codeberg.org/dnkl/foot/issues/181).
 
 
 ### Changed
 
 * Blinking text now uses the foreground color, but dimmed down in its
   off state, instead of the background color.
-* Trailing spaces are trimmed when copying a block selection
-  (https://codeberg.org/dnkl/foot/issues/181).
 
 
 ### Deprecated

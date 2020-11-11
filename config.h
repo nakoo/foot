@@ -168,6 +168,7 @@ struct config {
     char *server_socket_path;
     bool presentation_timings;
     bool hold_at_exit;
+    bool trim_trailing_spaces_from_selection;
 
     struct {
         enum fcft_scaling_filter fcft_filter;

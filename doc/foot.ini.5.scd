@@ -128,6 +128,10 @@ in this order:
 	text. Note that whitespace characters are _always_ word
 	delimiters, regardless of this setting. Default: _,│`|:"'()[]{}<>_
 
+*trim-trailing-spaces-from-selection*
+	Boolean. If enabled, trailing spaces are trimmed from selections
+	(both regular and block selections). Default: _no_.
+
 
 # SECTION: scrollback
 

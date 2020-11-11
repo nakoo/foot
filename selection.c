@@ -224,10 +224,9 @@ selection_to_text(const struct terminal *term)
     if (term->selection.end.row == -1)
         return NULL;
 
-    const enum selection_kind kind = term->selection.kind;
-    const bool trim_trailing_spaces = kind == SELECTION_BLOCK;
+    struct extraction_context *ctx = extract_begin(
+        term->selection.kind, term->conf->trim_trailing_spaces_from_selection);
 
-    struct extraction_context *ctx = extract_begin(kind, trim_trailing_spaces);
     if (ctx == NULL)
         return NULL;
 

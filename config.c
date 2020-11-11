@@ -601,6 +601,9 @@ parse_section_main(const char *key, const char *value, struct config *conf,
         mbstowcs(conf->word_delimiters, value, chars + 1);
     }
 
+    else if (strcmp(key, "trim-trailing-spaces-from-selection") == 0)
+        conf->trim_trailing_spaces_from_selection = str_to_bool(value);
+
     else if (strcmp(key, "scrollback") == 0) {
         LOG_WARN("deprecated: %s:%d: [default]: scrollback: use 'scrollback.lines' instead'", path, lineno);
 
@@ -2081,6 +2084,7 @@ config_load(struct config *conf, const char *conf_path,
         .server_socket_path = get_server_socket_path(),
         .presentation_timings = false,
         .hold_at_exit = false,
+        .trim_trailing_spaces_from_selection = false,
 
         .tweak = {
             .fcft_filter = FCFT_SCALING_FILTER_LANCZOS3,
