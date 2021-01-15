@@ -493,6 +493,18 @@ decset_decrst(struct terminal *term, unsigned param, bool enable)
         if (enable && term->grid != &term->alt) {
             selection_cancel(term);
 
+            /*
+             * A ‘cursor restore’ *after* returning from alt screen
+             * should restore the cursor from where it was when
+             * *entering* alt mode.
+             *
+             * I.e. entering alt mode “overwrites” the previous saved
+             * cursor position.
+             *
+             * Checked by vttest 11.8.7.3
+             */
+            term->grid->saved_cursor = term->grid->cursor;
+
             term->grid = &term->alt;
 
             term_cursor_to(

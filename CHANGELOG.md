@@ -80,6 +80,8 @@
   (https://codeberg.org/dnkl/foot/issues/291).
 * Sixel “current geometry” query response not being bounded by the
   current window dimensions (fixes `lsix` output)
+* Entering the alt screen did not update the normal screen’s “saved
+  cursor” position.
 
 
 ### Security
