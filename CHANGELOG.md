@@ -60,6 +60,8 @@
   size (https://codeberg.org/dnkl/foot/issues/281).
 * Extending a word/line-wise selection now uses the original selection
   mode instead of switching to character-wise.
+* Non-formatting C0 control characters, `BS`, `HT` and `DEL` are now
+  stripped from pasted text.
 
 
 ### Deprecated
