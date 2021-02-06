@@ -2,19 +2,19 @@
 
 #include "macros.h"
 
-#ifdef NDEBUG
-    #define BUG(...) UNREACHABLE()
-#else
-    #define BUG(...) bug(__FILE__, __LINE__, __func__, __VA_ARGS__)
-#endif
+#define BUG(...) bug(__FILE__, __LINE__, __func__, __VA_ARGS__)
 
-#define xassert(x) do { \
-    IGNORE_WARNING("-Wtautological-compare") \
-    if (unlikely(!(x))) { \
-        BUG("assertion failed: '%s'", #x); \
-    } \
-    UNIGNORE_WARNINGS \
-} while (0)
+#ifdef NDEBUG
+    #define xassert(x)
+#else
+    #define xassert(x) do { \
+        IGNORE_WARNING("-Wtautological-compare") \
+        if (unlikely(!(x))) { \
+            BUG("assertion failed: '%s'", #x); \
+        } \
+        UNIGNORE_WARNINGS \
+    } while (0)
+#endif
 
 #ifndef static_assert
     #if __STDC_VERSION__ >= 201112L
