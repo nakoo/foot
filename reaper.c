@@ -2,7 +2,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/epoll.h>
+#include <poll.h>
 #include <sys/wait.h>
 #include <sys/signalfd.h>
 #include <tllist.h>
@@ -60,7 +60,7 @@ reaper_init(struct fdm *fdm)
         .children = tll_init(),
     };
 
-    if (!fdm_add(fdm, fd, EPOLLIN, &fdm_reap, reaper)){
+    if (!fdm_add(fdm, fd, POLLIN, &fdm_reap, reaper)){
         LOG_ERR("failed to register with the FDM");
         goto err;
     }
@@ -115,8 +115,8 @@ fdm_reap(struct fdm *fdm, int fd, int events, void *data)
 {
     struct reaper *reaper = data;
 
-    bool pollin = events & EPOLLIN;
-    bool hup = events & EPOLLHUP;
+    bool pollin = events & POLLIN;
+    bool hup = events & POLLHUP;
 
     if (hup && !pollin)
         return false;

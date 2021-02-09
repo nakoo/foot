@@ -7,11 +7,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <poll.h>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/ioctl.h>
-#include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
 #include <fcntl.h>
@@ -84,7 +84,7 @@ data_to_slave(struct terminal *term, const void *data, size_t len,
     switch (async_write(term->ptmx, data, len, &async_idx)) {
     case ASYNC_WRITE_REMAIN:
         /* Switch to asynchronous mode; let FDM write the remaining data */
-        if (!fdm_event_add(term->fdm, term->ptmx, EPOLLOUT))
+        if (!fdm_event_add(term->fdm, term->ptmx, POLLOUT))
             return false;
         enqueue_data_for_slave(data, len, async_idx, buffer_list);
         return true;
@@ -196,7 +196,7 @@ fdm_ptmx_out(struct fdm *fdm, int fd, int events, void *data)
      * otherwise we'd just be called right away again, with nothing to
      * write.
      */
-    fdm_event_del(term->fdm, term->ptmx, EPOLLOUT);
+    fdm_event_del(term->fdm, term->ptmx, POLLOUT);
     return true;
 }
 
@@ -213,9 +213,9 @@ fdm_ptmx(struct fdm *fdm, int fd, int events, void *data)
 {
     struct terminal *term = data;
 
-    const bool pollin = events & EPOLLIN;
-    const bool pollout = events & EPOLLOUT;
-    const bool hup = events & EPOLLHUP;
+    const bool pollin = events & POLLIN;
+    const bool pollout = events & POLLOUT;
+    const bool hup = events & POLLHUP;
 
     if (pollout) {
         if (!fdm_ptmx_out(fdm, fd, events, data))
@@ -330,7 +330,7 @@ fdm_ptmx(struct fdm *fdm, int fd, int events, void *data)
 static bool
 fdm_flash(struct fdm *fdm, int fd, int events, void *data)
 {
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         return false;
 
     struct terminal *term = data;
@@ -358,7 +358,7 @@ fdm_flash(struct fdm *fdm, int fd, int events, void *data)
 static bool
 fdm_blink(struct fdm *fdm, int fd, int events, void *data)
 {
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         return false;
 
     struct terminal *term = data;
@@ -421,7 +421,7 @@ term_arm_blink_timer(struct terminal *term)
         return;
     }
 
-    if (!fdm_add(term->fdm, fd, EPOLLIN, &fdm_blink, term)) {
+    if (!fdm_add(term->fdm, fd, POLLIN, &fdm_blink, term)) {
         close(fd);
         return;
     }
@@ -450,7 +450,7 @@ cursor_refresh(struct terminal *term)
 static bool
 fdm_cursor_blink(struct fdm *fdm, int fd, int events, void *data)
 {
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         return false;
 
     struct terminal *term = data;
@@ -480,7 +480,7 @@ fdm_cursor_blink(struct fdm *fdm, int fd, int events, void *data)
 static bool
 fdm_delayed_render(struct fdm *fdm, int fd, int events, void *data)
 {
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         return false;
 
     struct terminal *term = data;
@@ -528,7 +528,7 @@ static bool
 fdm_app_sync_updates_timeout(
     struct fdm *fdm, int fd, int events, void *data)
 {
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         return false;
 
     struct terminal *term = data;
@@ -1063,10 +1063,10 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
      * size (and thus no grid) before then.
      */
 
-    if (!fdm_add(fdm, flash_fd, EPOLLIN, &fdm_flash, term) ||
-        !fdm_add(fdm, delay_lower_fd, EPOLLIN, &fdm_delayed_render, term) ||
-        !fdm_add(fdm, delay_upper_fd, EPOLLIN, &fdm_delayed_render, term) ||
-        !fdm_add(fdm, app_sync_updates_fd, EPOLLIN, &fdm_app_sync_updates_timeout, term))
+    if (!fdm_add(fdm, flash_fd, POLLIN, &fdm_flash, term) ||
+        !fdm_add(fdm, delay_lower_fd, POLLIN, &fdm_delayed_render, term) ||
+        !fdm_add(fdm, delay_upper_fd, POLLIN, &fdm_delayed_render, term) ||
+        !fdm_add(fdm, app_sync_updates_fd, POLLIN, &fdm_app_sync_updates_timeout, term))
     {
         goto err;
     }
@@ -1274,7 +1274,7 @@ term_window_configured(struct terminal *term)
     /* Enable ptmx FDM callback */
     if (!term->is_shutting_down) {
         xassert(term->window->is_configured);
-        fdm_add(term->fdm, term->ptmx, EPOLLIN, &fdm_ptmx, term);
+        fdm_add(term->fdm, term->ptmx, POLLIN, &fdm_ptmx, term);
     }
 }
 
@@ -1362,7 +1362,7 @@ term_shutdown(struct terminal *term)
         return false;
     }
 
-    if (!fdm_add(term->fdm, event_fd, EPOLLIN, &fdm_shutdown, term)) {
+    if (!fdm_add(term->fdm, event_fd, POLLIN, &fdm_shutdown, term)) {
         close(event_fd);
         return false;
     }
@@ -2038,7 +2038,7 @@ cursor_blink_rearm_timer(struct terminal *term)
             return false;
         }
 
-        if (!fdm_add(term->fdm, fd, EPOLLIN, &fdm_cursor_blink, term)) {
+        if (!fdm_add(term->fdm, fd, POLLIN, &fdm_cursor_blink, term)) {
             close(fd);
             return false;
         }

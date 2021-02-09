@@ -6,10 +6,10 @@
 #include <threads.h>
 #include <locale.h>
 #include <errno.h>
+#include <poll.h>
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <sys/timerfd.h>
-#include <sys/epoll.h>
 #include <fcntl.h>
 
 #include <linux/input-event-codes.h>
@@ -51,10 +51,10 @@ fdm_write_pipe(struct fdm *fdm, int fd, int events, void *data)
 {
     struct pipe_context *ctx = data;
 
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         goto pipe_closed;
 
-    xassert(events & EPOLLOUT);
+    xassert(events & POLLOUT);
     ssize_t written = write(fd, &ctx->text[ctx->idx], ctx->left);
 
     if (written < 0) {
@@ -253,7 +253,7 @@ execute_binding(struct seat *seat, struct terminal *term,
         };
 
         /* Asynchronously write the output to the pipe */
-        if (!fdm_add(term->fdm, pipe_fd[1], EPOLLOUT, &fdm_write_pipe, ctx))
+        if (!fdm_add(term->fdm, pipe_fd[1], POLLOUT, &fdm_write_pipe, ctx))
             goto pipe_err;
 
         return true;
@@ -1611,7 +1611,7 @@ wl_pointer_button(void *data, struct wl_pointer *wl_pointer,
                 int fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
                 if (fd >= 0 &&
                     timerfd_settime(fd, 0, &timeout, NULL) == 0 &&
-                    fdm_add(wayl->fdm, fd, EPOLLIN, &fdm_csd_move, seat))
+                    fdm_add(wayl->fdm, fd, POLLIN, &fdm_csd_move, seat))
                 {
                     win->csd.move_timeout_fd = fd;
                     win->csd.serial = serial;

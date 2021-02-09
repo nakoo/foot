@@ -3,11 +3,11 @@
 #include <string.h>
 #include <wctype.h>
 #include <unistd.h>
+#include <poll.h>
 
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/timerfd.h>
-#include <sys/epoll.h>
 #include <pthread.h>
 
 #include "macros.h"
@@ -2727,7 +2727,7 @@ fdm_tiocswinsz(struct fdm *fdm, int fd, int events, void *data)
 {
     struct terminal *term = data;
 
-    if (events & EPOLLIN)
+    if (events & POLLIN)
         tiocswinsz(term);
 
     fdm_del(fdm, fd);
@@ -2762,7 +2762,7 @@ send_dimensions_to_client(struct terminal *term)
             fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
             if (fd < 0)
                 LOG_ERRNO("failed to create TIOCSWINSZ timer");
-            else if (!fdm_add(term->fdm, fd, EPOLLIN, &fdm_tiocswinsz, term)) {
+            else if (!fdm_add(term->fdm, fd, POLLIN, &fdm_tiocswinsz, term)) {
                 close(fd);
                 fd = -1;
             }

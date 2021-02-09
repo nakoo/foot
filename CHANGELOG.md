@@ -49,6 +49,7 @@
 
 ### Changed
 
+* Use `poll()` instead of `epoll_wait()`.
 * The fcft and tllist library subprojects are now handled via Meson
   [wrap files](https://mesonbuild.com/Wrap-dependency-system-manual.html)
   instead of needing to be manually cloned.

@@ -3,11 +3,11 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include <string.h>
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
-
-#include <sys/epoll.h>
+#include <poll.h>
 
 #include <tllist.h>
 
@@ -15,13 +15,16 @@
 #define LOG_ENABLE_DBG 0
 #include "log.h"
 #include "debug.h"
+#include "xmalloc.h"
 
 struct handler {
-    int fd;
-    int events;
+    enum {
+        HANDLER_ACTIVE,
+        HANDLER_DEFERRED_DELETE,
+        HANDLER_DEFERRED_DELETE_AND_CLOSE
+    } status;
     fdm_handler_t callback;
     void *callback_data;
-    bool deleted;
 };
 
 struct hook {
@@ -32,35 +35,54 @@ struct hook {
 typedef tll(struct hook) hooks_t;
 
 struct fdm {
-    int epoll_fd;
-    bool is_polling;
-    tll(struct handler *) fds;
-    tll(struct handler *) deferred_delete;
+    /*
+     * Paired arrays of poll() data and the associated callbacks.
+     *
+     * Both arrays have <size> number of elements. The first <count>
+     * elements are valid/in use.
+     *
+     * <max_count> is for debugging/statistics, and tracks the maximum
+     * number of simultaniously active FDs.
+     */
+    struct pollfd *fds;
+    struct handler *handlers;
+    size_t count;
+    size_t size;
+    size_t max_count;
+
     hooks_t hooks_low;
     hooks_t hooks_normal;
     hooks_t hooks_high;
+    bool is_polling;
 };
+
+static const size_t min_slot_count = 32;
 
 struct fdm *
 fdm_init(void)
 {
-    int epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-    if (epoll_fd == -1) {
-        LOG_ERRNO("failed to create epoll FD");
-        return NULL;
-    }
-
     struct fdm *fdm = malloc(sizeof(*fdm));
     if (unlikely(fdm == NULL)) {
         LOG_ERRNO("malloc() failed");
         return NULL;
     }
 
+    struct pollfd *fds = malloc(min_slot_count * sizeof(fds[0]));
+    struct handler *handlers = malloc(min_slot_count * sizeof(handlers[0]));
+
+    if (fds == NULL || handlers == NULL) {
+        LOG_ERRNO("failed to allocate initial array of FD handlers");
+        free(handlers);
+        free(fds);
+        free(fdm);
+        return NULL;
+    }
+
     *fdm = (struct fdm){
-        .epoll_fd = epoll_fd,
         .is_polling = false,
-        .fds = tll_init(),
-        .deferred_delete = tll_init(),
+        .fds = fds,
+        .handlers = handlers,
+        .size = min_slot_count,
         .hooks_low = tll_init(),
         .hooks_normal = tll_init(),
         .hooks_high = tll_init(),
@@ -74,7 +96,9 @@ fdm_destroy(struct fdm *fdm)
     if (fdm == NULL)
         return;
 
-    if (tll_length(fdm->fds) > 0)
+    LOG_DBG("max FDs registered: %zu", fdm->max_count);
+
+    if (fdm->count > 0)
         LOG_WARN("FD list not empty");
 
     if (tll_length(fdm->hooks_low) > 0 ||
@@ -84,34 +108,25 @@ fdm_destroy(struct fdm *fdm)
         LOG_WARN("hook list not empty");
     }
 
-    xassert(tll_length(fdm->fds) == 0);
-    xassert(tll_length(fdm->deferred_delete) == 0);
+    xassert(fdm->count == 0);
     xassert(tll_length(fdm->hooks_low) == 0);
     xassert(tll_length(fdm->hooks_normal) == 0);
     xassert(tll_length(fdm->hooks_high) == 0);
 
-    tll_free(fdm->fds);
-    tll_free(fdm->deferred_delete);
+    free(fdm->fds);
+    free(fdm->handlers);
     tll_free(fdm->hooks_low);
     tll_free(fdm->hooks_normal);
     tll_free(fdm->hooks_high);
-    close(fdm->epoll_fd);
     free(fdm);
 }
 
 bool
-fdm_add(struct fdm *fdm, int fd, int events, fdm_handler_t handler, void *data)
+fdm_add(struct fdm *fdm, int fd, int events, fdm_handler_t cb, void *data)
 {
 #if defined(_DEBUG)
-    int flags = fcntl(fd, F_GETFL);
-    if (!(flags & O_NONBLOCK)) {
-        LOG_ERR("FD=%d is in blocking mode", fd);
-        xassert(false);
-        return false;
-    }
-
-    tll_foreach(fdm->fds, it) {
-        if (it->item->fd == fd) {
+    for (size_t i = 0; i < fdm->count; i++) {
+        if (fdm->fds[i].fd == fd) {
             LOG_ERR("FD=%d already registered", fd);
             xassert(false);
             return false;
@@ -119,35 +134,58 @@ fdm_add(struct fdm *fdm, int fd, int events, fdm_handler_t handler, void *data)
     }
 #endif
 
-    struct handler *fd_data = malloc(sizeof(*fd_data));
-    if (unlikely(fd_data == NULL)) {
-        LOG_ERRNO("malloc() failed");
-        return false;
+    if (fdm->count >= fdm->size) {
+        /* No free slot - increase number of pollfds + handlers */
+
+        size_t old_size = fdm->size;
+        size_t new_size = old_size * 2;
+
+        fdm->fds = xrealloc(fdm->fds, new_size * sizeof(fdm->fds[0]));
+        fdm->handlers = xrealloc(fdm->handlers, new_size * sizeof(fdm->handlers[0]));
+        fdm->size = new_size;
     }
 
-    *fd_data = (struct handler) {
-        .fd = fd,
-        .events = events,
-        .callback = handler,
-        .callback_data = data,
-        .deleted = false,
-    };
+    xassert(fdm->count < fdm->size);
 
-    tll_push_back(fdm->fds, fd_data);
+    struct pollfd *pfd = &fdm->fds[fdm->count];
+    struct handler *handler = &fdm->handlers[fdm->count];
+    
+    pfd->fd = fd;
+    pfd->events = events;
 
-    struct epoll_event ev = {
-        .events = events,
-        .data = {.ptr = fd_data},
-    };
+    handler->callback = cb;
+    handler->callback_data = data;
+    handler->status = HANDLER_ACTIVE;
 
-    if (epoll_ctl(fdm->epoll_fd, EPOLL_CTL_ADD, fd, &ev) < 0) {
-        LOG_ERRNO("failed to register FD=%d with epoll", fd);
-        free(fd_data);
-        tll_pop_back(fdm->fds);
-        return false;
-    }
+    if (++fdm->count > fdm->max_count)
+        fdm->max_count = fdm->count;
 
     return true;
+}
+
+static void
+deferred_delete(struct fdm *fdm, size_t idx)
+{
+    xassert(!fdm->is_polling);
+    xassert(idx < fdm->count);
+
+    struct handler *handler = &fdm->handlers[idx];
+    xassert(fdm->handlers[idx].status != HANDLER_ACTIVE);
+
+    if (handler->status == HANDLER_DEFERRED_DELETE_AND_CLOSE) {
+        xassert(fdm->fds[idx].fd >= 0);
+        close(fdm->fds[idx].fd);
+    }
+
+    const size_t remaining = fdm->count - (idx + 1);
+
+    memmove(&fdm->fds[idx], &fdm->fds[idx + 1],
+            remaining * sizeof(fdm->fds[0]));
+
+    memmove(&fdm->handlers[idx], &fdm->handlers[idx + 1],
+            remaining * sizeof(fdm->handlers[0]));
+
+    fdm->count--;
 }
 
 static bool
@@ -156,28 +194,26 @@ fdm_del_internal(struct fdm *fdm, int fd, bool close_fd)
     if (fd == -1)
         return true;
 
-    tll_foreach(fdm->fds, it) {
-        if (it->item->fd != fd)
+    for (size_t i = 0; i < fdm->count; i++) {
+        struct pollfd *pfd = &fdm->fds[i];
+        struct handler *handler = &fdm->handlers[i];
+
+        if (pfd->fd != fd)
             continue;
 
-        if (epoll_ctl(fdm->epoll_fd, EPOLL_CTL_DEL, fd, NULL) < 0)
-            LOG_ERRNO("failed to unregister FD=%d from epoll", fd);
+        handler->status = close_fd
+            ? HANDLER_DEFERRED_DELETE_AND_CLOSE
+            : HANDLER_DEFERRED_DELETE;
 
-        if (close_fd)
-            close(it->item->fd);
+        if (!fdm->is_polling)
+            deferred_delete(fdm, i);
 
-        it->item->deleted = true;
-        if (fdm->is_polling)
-            tll_push_back(fdm->deferred_delete, it->item);
-        else
-            free(it->item);
-
-        tll_remove(fdm->fds, it);
         return true;
     }
 
     LOG_ERR("no such FD: %d", fd);
-    close(fd);
+    if (close_fd)
+        close(fd);
     return false;
 }
 
@@ -193,35 +229,17 @@ fdm_del_no_close(struct fdm *fdm, int fd)
     return fdm_del_internal(fdm, fd, false);
 }
 
-static bool
-event_modify(struct fdm *fdm, struct handler *fd, int new_events)
-{
-    if (new_events == fd->events)
-        return true;
-
-    struct epoll_event ev = {
-        .events = new_events,
-        .data = {.ptr = fd},
-    };
-
-    if (epoll_ctl(fdm->epoll_fd, EPOLL_CTL_MOD, fd->fd, &ev) < 0) {
-        LOG_ERRNO("failed to modify FD=%d with epoll (events 0x%08x -> 0x%08x)",
-                  fd->fd, fd->events, new_events);
-        return false;
-    }
-
-    fd->events = new_events;
-    return true;
-}
-
 bool
 fdm_event_add(struct fdm *fdm, int fd, int events)
 {
-    tll_foreach(fdm->fds, it) {
-        if (it->item->fd != fd)
+    for (size_t i = 0; i < fdm->count; i++) {
+        struct pollfd *pfd = &fdm->fds[i];
+
+        if (pfd->fd != fd)
             continue;
 
-        return event_modify(fdm, it->item, it->item->events | events);
+        pfd->events |= events;
+        return true;
     }
 
     LOG_ERR("FD=%d not registered with the FDM", fd);
@@ -231,11 +249,14 @@ fdm_event_add(struct fdm *fdm, int fd, int events)
 bool
 fdm_event_del(struct fdm *fdm, int fd, int events)
 {
-    tll_foreach(fdm->fds, it) {
-        if (it->item->fd != fd)
+    for (size_t i = 0; i < fdm->count; i++) {
+        struct pollfd *pfd = &fdm->fds[i];
+
+        if (pfd->fd != fd)
             continue;
 
-        return event_modify(fdm, it->item, it->item->events & ~events);
+        pfd->events &= ~events;
+        return true;
     }
 
     LOG_ERR("FD=%d not registered with the FDM", fd);
@@ -322,36 +343,53 @@ fdm_poll(struct fdm *fdm)
         it->item.callback(fdm, it->item.callback_data);
     }
 
-    struct epoll_event events[tll_length(fdm->fds)];
-
-    int r = epoll_wait(fdm->epoll_fd, events, tll_length(fdm->fds), -1);
+    int r = poll(fdm->fds, fdm->count, -1);
     if (unlikely(r < 0)) {
         if (errno == EINTR)
             return true;
 
-        LOG_ERRNO("failed to epoll");
+        LOG_ERRNO("failed to poll");
         return false;
     }
 
     bool ret = true;
 
     fdm->is_polling = true;
-    for (int i = 0; i < r; i++) {
-        struct handler *fd = events[i].data.ptr;
-        if (fd->deleted)
+    for (int i = 0, matched = 0; matched < r; i++) {
+        xassert(i < fdm->count);
+
+        struct pollfd *pfd = &fdm->fds[i];
+        if (pfd->revents == 0)
             continue;
 
-        if (!fd->callback(fdm, fd->fd, events[i].events, fd->callback_data)) {
-            ret = false;
-            break;
+        matched++;
+
+        struct handler *handler = &fdm->handlers[i];
+        if (handler->status == HANDLER_ACTIVE) {
+            if (!handler->callback(
+                    fdm, pfd->fd, pfd->revents, handler->callback_data))
+            {
+                ret = false;
+                break;
+            }
         }
     }
+
     fdm->is_polling = false;
 
-    tll_foreach(fdm->deferred_delete, it) {
-        free(it->item);
-        tll_remove(fdm->deferred_delete, it);
-    }
+    size_t count = fdm->count;
+    size_t i = 0;
 
+    while (i < count) {
+        struct handler *handler = &fdm->handlers[i];
+        if (handler->status == HANDLER_ACTIVE) {
+            i++;
+            continue;
+        }
+
+        deferred_delete(fdm, i);
+        count--;
+    }
+    
     return ret;
 }

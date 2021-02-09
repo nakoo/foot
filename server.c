@@ -3,10 +3,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <poll.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/epoll.h>
 
 #include <sys/un.h>
 
@@ -120,10 +120,10 @@ fdm_client(struct fdm *fdm, int fd, int events, void *data)
 
     char **argv = NULL;
 
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         goto shutdown;
 
-    xassert(events & EPOLLIN);
+    xassert(events & POLLIN);
 
     if (client->term != NULL) {
         uint8_t dummy[128];
@@ -299,7 +299,7 @@ shutdown:
 static bool
 fdm_server(struct fdm *fdm, int fd, int events, void *data)
 {
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         return false;
 
     struct server *server = data;
@@ -320,7 +320,7 @@ fdm_server(struct fdm *fdm, int fd, int events, void *data)
         .fd = client_fd,
     };
 
-    if (!fdm_add(server->fdm, client_fd, EPOLLIN, &fdm_client, client)) {
+    if (!fdm_add(server->fdm, client_fd, POLLIN, &fdm_client, client)) {
         close(client_fd);
         free(client);
         return false;
@@ -422,7 +422,7 @@ server_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         .clients = tll_init(),
     };
 
-    if (!fdm_add(fdm, fd, EPOLLIN, &fdm_server, server))
+    if (!fdm_add(fdm, fd, POLLIN, &fdm_server, server))
         goto err;
 
     LOG_INFO("accepting connections on %s", sock_path);

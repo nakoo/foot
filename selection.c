@@ -6,8 +6,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <wctype.h>
+#include <poll.h>
 
-#include <sys/epoll.h>
 #include <sys/timerfd.h>
 
 #define LOG_MODULE "selection"
@@ -1106,7 +1106,7 @@ selection_primary_unset(struct seat *seat)
 static bool
 fdm_scroll_timer(struct fdm *fdm, int fd, int events, void *data)
 {
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         return false;
 
     struct terminal *term = data;
@@ -1159,7 +1159,7 @@ selection_start_scroll_timer(struct terminal *term, int interval_ns,
             goto err;
         }
 
-        if (!fdm_add(term->fdm, fd, EPOLLIN, &fdm_scroll_timer, term)) {
+        if (!fdm_add(term->fdm, fd, POLLIN, &fdm_scroll_timer, term)) {
             close(fd);
             return;
         }
@@ -1223,7 +1223,7 @@ fdm_send(struct fdm *fdm, int fd, int events, void *data)
 {
     struct clipboard_send *ctx = data;
 
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         goto done;
 
     switch (async_write(fd, ctx->data, ctx->len, &ctx->idx)) {
@@ -1273,7 +1273,7 @@ send_clipboard_or_primary(struct seat *seat, int fd, const char *selection,
             .idx = 0,
         };
 
-        if (fdm_add(seat->wayl->fdm, fd, EPOLLOUT, &fdm_send, ctx))
+        if (fdm_add(seat->wayl->fdm, fd, POLLOUT, &fdm_send, ctx))
             return;
 
         free(ctx->data);
@@ -1471,10 +1471,10 @@ static bool
 fdm_receive_timeout(struct fdm *fdm, int fd, int events, void *data)
 {
     struct clipboard_receive *ctx = data;
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         return false;
 
-    xassert(events & EPOLLIN);
+    xassert(events & POLLIN);
 
     uint64_t expire_count;
     ssize_t ret = read(fd, &expire_count, sizeof(expire_count));
@@ -1582,7 +1582,7 @@ fdm_receive(struct fdm *fdm, int fd, int events, void *data)
 {
     struct clipboard_receive *ctx = data;
 
-    if ((events & EPOLLHUP) && !(events & EPOLLIN))
+    if ((events & POLLHUP) && !(events & POLLIN))
         goto done;
 
     /* Reset timeout timer */
@@ -1716,8 +1716,8 @@ begin_receive_clipboard(struct terminal *term, int read_fd,
         .user = user,
     };
 
-    if (!fdm_add(term->fdm, read_fd, EPOLLIN, &fdm_receive, ctx) ||
-        !fdm_add(term->fdm, timeout_fd, EPOLLIN, &fdm_receive_timeout, ctx))
+    if (!fdm_add(term->fdm, read_fd, POLLIN, &fdm_receive, ctx) ||
+        !fdm_add(term->fdm, timeout_fd, POLLIN, &fdm_receive_timeout, ctx))
     {
         goto err;
     }
@@ -1787,7 +1787,7 @@ receive_offer_done(void *user)
 
     /* Make sure we send any queued up non-paste data */
     if (tll_length(term->ptmx_buffers) > 0)
-        fdm_event_add(term->fdm, term->ptmx, EPOLLOUT);
+        fdm_event_add(term->fdm, term->ptmx, POLLOUT);
 }
 
 void

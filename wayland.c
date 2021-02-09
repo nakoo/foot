@@ -6,9 +6,9 @@
 #include <errno.h>
 #include <poll.h>
 #include <fcntl.h>
+#include <poll.h>
 
 #include <sys/timerfd.h>
-#include <sys/epoll.h>
 
 #include <wayland-client.h>
 #include <wayland-cursor.h>
@@ -770,7 +770,7 @@ static const struct zxdg_toplevel_decoration_v1_listener xdg_toplevel_decoration
 static bool
 fdm_repeat(struct fdm *fdm, int fd, int events, void *data)
 {
-    if (events & EPOLLHUP)
+    if (events & POLLHUP)
         return false;
 
     struct seat *seat = data;
@@ -879,7 +879,7 @@ handle_global(void *data, struct wl_registry *registry,
 
         struct seat *seat = &tll_back(wayl->seats);
 
-        if (!fdm_add(wayl->fdm, repeat_fd, EPOLLIN, &fdm_repeat, seat)) {
+        if (!fdm_add(wayl->fdm, repeat_fd, POLLIN, &fdm_repeat, seat)) {
             close(repeat_fd);
             seat->kbd.repeat.fd = -1;
             seat_destroy(seat);
@@ -1092,7 +1092,7 @@ fdm_wayl(struct fdm *fdm, int fd, int events, void *data)
     struct wayland *wayl = data;
     int event_count = 0;
 
-    if (events & EPOLLIN) {
+    if (events & POLLIN) {
         if (wl_display_read_events(wayl->display) < 0) {
             LOG_ERRNO("failed to read events from the Wayland socket");
             return false;
@@ -1102,7 +1102,7 @@ fdm_wayl(struct fdm *fdm, int fd, int events, void *data)
             wl_display_dispatch_pending(wayl->display);
     }
 
-    if (events & EPOLLHUP) {
+    if (events & POLLHUP) {
         LOG_WARN("disconnected from Wayland");
         wl_display_cancel_read(wayl->display);
         return false;
@@ -1206,7 +1206,7 @@ wayl_init(const struct config *conf, struct fdm *fdm)
         goto out;
     }
 
-    if (!fdm_add(fdm, wayl->fd, EPOLLIN, &fdm_wayl, wayl))
+    if (!fdm_add(fdm, wayl->fd, POLLIN, &fdm_wayl, wayl))
         goto out;
 
     if (wl_display_prepare_read(wayl->display) != 0) {
