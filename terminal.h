@@ -280,6 +280,7 @@ struct terminal {
 
     struct charsets charsets;
     struct charsets saved_charsets; /* For save/restore cursor + attributes */
+    enum charset charset;  /* cached copy of charsets.set[charsets.selected] */
 
     bool auto_margin;
     bool insert_mode;

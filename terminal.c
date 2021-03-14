@@ -2335,6 +2335,7 @@ term_restore_cursor(struct terminal *term, const struct cursor *cursor)
 
     term->vt.attrs = term->vt.saved_attrs;
     term->charsets = term->saved_charsets;
+    term->charset = term->charsets.set[term->charsets.selected];
 }
 
 void

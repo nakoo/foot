@@ -184,11 +184,13 @@ action_execute(struct terminal *term, uint8_t c)
     case '\x0e':
         /* SO - shift out */
         term->charsets.selected = 1; /* G1 */
+        term->charset = term->charsets.set[1];
         break;
 
     case '\x0f':
         /* SI - shift in */
         term->charsets.selected = 0; /* G0 */
+        term->charset = term->charsets.set[0];
         break;
 
         /*
@@ -238,13 +240,10 @@ action_print(struct terminal *term, uint8_t c)
         L'│', L'≤', L'≥', L'π', L'≠', L'£', L'·',       /* x - ~ */
     };
 
-    if (unlikely(term->charsets.set[term->charsets.selected] == CHARSET_GRAPHIC) &&
-        c >= 0x60 && c <= 0x7e)
-    {
+    if (unlikely(term->charset == CHARSET_GRAPHIC) && c >= 0x60 && c <= 0x7e)
         term_print(term, vt100_0[c - 0x60], 1);
-    } else {
+    else
         term_print(term, c, 1);
-    }
 }
 
 static void
@@ -414,11 +413,13 @@ action_esc_dispatch(struct terminal *term, uint8_t final)
         case 'N':
             /* SS2 - Single Shift 2 */
             term->charsets.selected = 2; /* G2 */
+            term->charset = term->charsets.set[2];
             break;
 
         case 'O':
             /* SS3 - Single Shift 3 */
             term->charsets.selected = 3; /* G3 */
+            term->charset = term->charsets.set[3];
             break;
 
         case '\\':
@@ -453,6 +454,8 @@ action_esc_dispatch(struct terminal *term, uint8_t final)
                 '+' ? 3 : -1;
             xassert(idx != -1);
             term->charsets.set[idx] = CHARSET_GRAPHIC;
+            if (idx == term->charsets.selected)
+                term->charset = CHARSET_GRAPHIC;
             break;
         }
 
@@ -465,7 +468,8 @@ action_esc_dispatch(struct terminal *term, uint8_t final)
                 '+' ? 3 : -1;
             xassert(idx != -1);
             term->charsets.set[idx] = CHARSET_ASCII;
-
+            if (idx == term->charsets.selected)
+                term->charset = CHARSET_ASCII;
             break;
         }
         }
