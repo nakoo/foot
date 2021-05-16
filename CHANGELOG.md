@@ -103,6 +103,8 @@
   (https://codeberg.org/dnkl/foot/issues/503).
 * Sixels with transparent bottom border being resized below the size
   specified in _”Set Raster Attributes”_.
+* Crash caused by certain CSI sequences with very large parameter
+  values (https://codeberg.org/dnkl/foot/issues/522).
 
 
 ### Security
