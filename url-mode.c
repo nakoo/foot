@@ -220,6 +220,7 @@ auto_detected(const struct terminal *term, enum url_action action,
         L"file://",
         L"gemini://",
         L"gopher://",
+        L"emxc://",
     };
 
     size_t max_prot_len = 0;
