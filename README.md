@@ -33,6 +33,7 @@ The fast, lightweight and minimalistic Wayland terminal emulator.
 1. [Bugs](#bugs)
 1. [Contact](#contact)
    1. [IRC](#irc)
+      1. [Freenode](#freenode)
    1. [Mastodon](#mastodon)
 1. [License](#license)
 
@@ -444,6 +445,21 @@ The report should contain the following:
 Ask questions, hang out, sing praise or just say hi in the `#foot`
 channel on [irc.libera.chat](https://libera.chat). Logs are available
 at https://libera.irclog.whitequark.org/foot.
+
+
+### Freenode
+
+**TL;DR** there is **no** official `#foot` channel on Freenode.
+
+We used to operate `#foot-terminal`. On 2021-05-26, this channel was
+taken over by freenode staff. I was de-op:ed and devoiced:
+
+```
+03:04  freenodecom  This channel has been reopened with respect to the communities and new users. The topic is in violation of freenode policy: freenode.net/policies
+03:04  freenodecom  The new channel is ##foot-terminal
+```
+
+The new channel mentioned, `##foot-terminal` is **not** run by us.
 
 
 ## Mastodon
