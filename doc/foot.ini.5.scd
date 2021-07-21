@@ -145,6 +145,10 @@ in this order:
 	
 	Default: _no_.
 
+	*subpixel-with-alpha*
+	Boolean. When enabled, subpixel font rendering will be used also
+	with transparent background. Default: _no_.
+
 *dpi-aware*
 	*auto*, *yes*, or *no*. When set to *yes*, fonts are sized using
 	the monitor's DPI, making a font of a given size have the same

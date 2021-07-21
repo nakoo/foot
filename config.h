@@ -114,6 +114,8 @@ struct config {
     bool box_drawings_uses_font_glyphs;
     bool can_shape_grapheme;
 
+    bool subpixel_with_alpha;
+
     struct {
         bool urgent;
         bool notify;

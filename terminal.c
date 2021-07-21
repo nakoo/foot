@@ -760,7 +760,7 @@ get_font_dpi(const struct terminal *term)
 static enum fcft_subpixel
 get_font_subpixel(const struct terminal *term)
 {
-    if (term->colors.alpha != 0xffff) {
+    if (!term->conf->subpixel_with_alpha && term->colors.alpha != 0xffff) {
         /* Can't do subpixel rendering on transparent background */
         return FCFT_SUBPIXEL_NONE;
     }
@@ -1086,7 +1086,7 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
             xmalloc(sizeof(term->font_sizes[3][0]) * conf->fonts[3].count),
         },
         .font_dpi = 0.,
-        .font_subpixel = (conf->colors.alpha == 0xffff  /* Can't do subpixel rendering on transparent background */
+        .font_subpixel = ((conf->subpixel_with_alpha || conf->colors.alpha == 0xffff)  /* Can't do subpixel rendering on transparent background */
                           ? FCFT_SUBPIXEL_DEFAULT
                           : FCFT_SUBPIXEL_NONE),
         .cursor_keys_mode = CURSOR_KEYS_NORMAL,

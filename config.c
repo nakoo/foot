@@ -961,6 +961,9 @@ parse_section_main(const char *key, const char *value, struct config *conf,
     else if (strcmp(key, "box-drawings-uses-font-glyphs") == 0)
         conf->box_drawings_uses_font_glyphs = str_to_bool(value);
 
+    else if (strcmp(key, "subpixel-with-alpha") == 0)
+        conf->subpixel_with_alpha = str_to_bool(value);
+
     else {
         LOG_AND_NOTIFY_ERR("%s:%u: [default]: %s: invalid key", path, lineno, key);
         return false;
@@ -2740,6 +2743,7 @@ config_load(struct config *conf, const char *conf_path,
         .vertical_letter_offset = {.pt = 0, .px = 0},
         .use_custom_underline_offset = false,
         .box_drawings_uses_font_glyphs = false,
+        .subpixel_with_alpha = false,
         .dpi_aware = DPI_AWARE_AUTO, /* DPI-aware when scaling-factor == 1 */
         .bell = {
             .urgent = false,
