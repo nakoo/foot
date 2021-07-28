@@ -54,6 +54,8 @@
 * Foot now sends `SIGTERM`/`SIGKILL` to the client application’s process group,
   instead of just to the client application’s process.
 * `kmous` terminfo capability from `\E[M` to `\E[<`.
+* `<` and `>` are now recognized as valid URL characters
+  (https://codeberg.org/dnkl/foot/issues/654).
 
 
 ### Deprecated

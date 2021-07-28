@@ -288,6 +288,7 @@ auto_detected(const struct terminal *term, enum url_action action,
                 case L'/': case L'?': case L'#': case L'@': case L'!':
                 case L'$': case L'&': case L'\'': case L'*': case L'+':
                 case L',': case L';': case L'=': case L'"': case L'%':
+                case L'<': case L'>':
                     url[len++] = wc;
                     break;
 
