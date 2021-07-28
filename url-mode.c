@@ -230,6 +230,7 @@ auto_detected(const struct terminal *term, enum url_action action,
 
     ssize_t parenthesis = 0;
     ssize_t brackets = 0;
+    ssize_t ltgts = 0;
 
     for (int r = 0; r < term->rows; r++) {
         const struct row *row = grid_row_in_view(term->grid, r);
@@ -288,7 +289,6 @@ auto_detected(const struct terminal *term, enum url_action action,
                 case L'/': case L'?': case L'#': case L'@': case L'!':
                 case L'$': case L'&': case L'\'': case L'*': case L'+':
                 case L',': case L';': case L'=': case L'"': case L'%':
-                case L'<': case L'>':
                     url[len++] = wc;
                     break;
 
@@ -302,6 +302,11 @@ auto_detected(const struct terminal *term, enum url_action action,
                     url[len++] = wc;
                     break;
 
+                case L'<':
+                    ltgts++;
+                    url[len++] = wc;
+                    break;
+
                 case L')':
                     if (--parenthesis < 0)
                         emit_url = true;
@@ -311,6 +316,13 @@ auto_detected(const struct terminal *term, enum url_action action,
 
                 case L']':
                     if (--brackets < 0)
+                        emit_url = true;
+                    else
+                        url[len++] = wc;
+                    break;
+
+                case L'>':
+                    if (--ltgts < 0)
                         emit_url = true;
                     else
                         url[len++] = wc;
