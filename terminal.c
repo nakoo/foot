@@ -1176,6 +1176,7 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
             .max_width = SIXEL_MAX_WIDTH,
             .max_height = SIXEL_MAX_HEIGHT,
         },
+        .exit_status = EXIT_FAILURE,
         .shutdown_cb = shutdown_cb,
         .shutdown_data = shutdown_data,
         .foot_exe = xstrdup(foot_exe),
@@ -1317,6 +1318,15 @@ fdm_shutdown(struct fdm *fdm, int fd, int events, void *data)
     return true;
 }
 
+static volatile sig_atomic_t alarm_raised;
+
+static void
+sig_alarm(int signo)
+{
+    LOG_DBG("SIGALRM");
+    alarm_raised = 1;
+}
+
 bool
 term_shutdown(struct terminal *term)
 {
@@ -1349,6 +1359,64 @@ term_shutdown(struct terminal *term)
     else
         close(term->ptmx);
 
+    if (term->slave > 0 && !term->slave_has_been_reaped) {
+        LOG_DBG("waiting for slave (PID=%u) to die", term->slave);
+
+        /*
+         * Note: we've closed ptmx, so the slave *should* exit...
+         *
+         * But, since it is possible to write clients that ignore
+         * this, we need to handle it in *some* way.
+         *
+         * So, what we do is register a SIGALRM handler, and configure
+         * a 2 second alarm. If the slave hasn't died after this time,
+         * we send it a SIGTERM, then wait another 2 seconds (using
+         * the same alarm mechanism). If it still hasn't died, we send
+         * it a SIGKILL.
+         *
+         * Note that this solution is *not* asynchronous, and any
+         * other events etc will be ignored during this time. This of
+         * course only applies to a 'foot --server' instance, where
+         * there might be other terminals running.
+         */
+        sigaction(SIGALRM, &(const struct sigaction){.sa_handler = &sig_alarm}, NULL);
+        alarm(2);
+
+        int kill_signal = SIGTERM;
+
+        while (true) {
+            int r = waitpid(term->slave, &term->exit_status, 0);
+
+            if (r == term->slave)
+                break;
+
+            if (r == -1) {
+                xassert(errno == EINTR);
+
+                if (alarm_raised) {
+                    LOG_DBG("slave hasn't died yet, sending: %s (%d)",
+                            kill_signal == SIGTERM ? "SIGTERM" : "SIGKILL",
+                            kill_signal);
+
+                    kill(term->slave, kill_signal);
+
+                    alarm_raised = 0;
+                    if (kill_signal != SIGKILL)
+                        alarm(2);
+
+                    kill_signal = SIGKILL;
+
+                }
+            }
+        }
+
+        term->slave_has_been_reaped = true;
+
+        /* Cancel alarm */
+        alarm(0);
+        sigaction(SIGALRM, &(const struct sigaction){.sa_handler = SIG_DFL}, NULL);
+    }
+
     term->selection.auto_scroll.fd = -1;
     term->render.app_sync_updates.timer_fd = -1;
     term->render.title.timer_fd = -1;
@@ -1376,15 +1444,6 @@ term_shutdown(struct terminal *term)
     }
 
     return true;
-}
-
-static volatile sig_atomic_t alarm_raised;
-
-static void
-sig_alarm(int signo)
-{
-    LOG_DBG("SIGALRM");
-    alarm_raised = 1;
 }
 
 int
@@ -1496,70 +1555,13 @@ term_destroy(struct terminal *term)
     free(term->foot_exe);
     free(term->cwd);
 
-    int ret = EXIT_SUCCESS;
+    xassert(term->slave <= 0 || term->slave_has_been_reaped);
+    int ret;
 
-    if (term->slave > 0) {
-        int exit_status;
-
-        if (term->slave_has_been_reaped)
-            exit_status = term->exit_status;
-        else {
-            LOG_DBG("waiting for slave (PID=%u) to die", term->slave);
-
-            /*
-             * Note: we've closed ptmx, so the slave *should* exit...
-             *
-             * But, since it is possible to write clients that ignore
-             * this, we need to handle it in *some* way.
-             *
-             * So, what we do is register a SIGALRM handler, and configure
-             * a 2 second alarm. If the slave hasn't died after this time,
-             * we send it a SIGTERM, then wait another 2 seconds (using
-             * the same alarm mechanism). If it still hasn't died, we send
-             * it a SIGKILL.
-             *
-             * Note that this solution is *not* asynchronous, and any
-             * other events etc will be ignored during this time. This of
-             * course only applies to a 'foot --server' instance, where
-             * there might be other terminals running.
-             */
-            sigaction(SIGALRM, &(const struct sigaction){.sa_handler = &sig_alarm}, NULL);
-            alarm(2);
-
-            int kill_signal = SIGTERM;
-
-            while (true) {
-                int r = waitpid(term->slave, &exit_status, 0);
-
-                if (r == term->slave)
-                    break;
-
-                if (r == -1) {
-                    xassert(errno == EINTR);
-
-                    if (alarm_raised) {
-                        LOG_DBG("slave hasn't died yet, sending: %s (%d)",
-                                kill_signal == SIGTERM ? "SIGTERM" : "SIGKILL",
-                                kill_signal);
-
-                        kill(term->slave, kill_signal);
-
-                        alarm_raised = 0;
-                        if (kill_signal != SIGKILL)
-                            alarm(2);
-
-                        kill_signal = SIGKILL;
-
-                    }
-                }
-            }
-
-            /* Cancel alarm */
-            alarm(0);
-            sigaction(SIGALRM, &(const struct sigaction){.sa_handler = SIG_DFL}, NULL);
-        }
-
-        ret = EXIT_FAILURE;
+    if (term->slave == 0)
+        ret = EXIT_SUCCESS;
+    else {
+        int exit_status = term->exit_status;
         if (WIFEXITED(exit_status)) {
             ret = WEXITSTATUS(exit_status);
             LOG_DBG("slave exited with code %d", ret);
@@ -1567,6 +1569,7 @@ term_destroy(struct terminal *term)
             ret = WTERMSIG(exit_status);
             LOG_WARN("slave exited with signal %d (%s)", ret, strsignal(ret));
         } else {
+            ret = EXIT_FAILURE;
             LOG_WARN("slave exited for unknown reason (status = 0x%08x)",
                      exit_status);
         }
