@@ -41,7 +41,7 @@
 
 * `bold-text-in-bright=palette-based` now only brightens colors from palette
 * When closing the window with the compositor’s close/kill command, the window
-  is now teared down after the client application has terminated
+  is now torn down after the client application has terminated
   (https://codeberg.org/dnkl/foot/pulls/661).
 
 
