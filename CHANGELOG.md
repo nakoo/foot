@@ -40,6 +40,9 @@
 ### Changed
 
 * `bold-text-in-bright=palette-based` now only brightens colors from palette
+* When closing the window with the compositor’s close/kill command, the window
+  is now teared down after the client application has terminated
+  (https://codeberg.org/dnkl/foot/pulls/661).
 
 
 ### Deprecated
@@ -56,6 +59,10 @@
   (https://codeberg.org/dnkl/foot/issues/651).
 * Output scale being zero on compositors that does not advertise a
   scaling factor.
+* Delay in surface resize in the remaining window when closing one of two
+  footclient windows next to each other in a tiling WM (e.g. Sway). This
+  resulted in intermediate frames where the WM centered the un-resized surface
+  in a too big window (https://codeberg.org/dnkl/foot/pulls/661).
 
 
 ### Security
