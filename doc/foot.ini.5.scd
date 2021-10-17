@@ -773,6 +773,9 @@ scrollback search mode. The syntax is exactly the same as the regular
 This section lets you override the default key bindings used in URL
 mode. The syntax is exactly the same as the regular **key-bindings**.
 
+Be careful; do not use single-letter keys that are also used in
+*[url].label-letters*, as doing so will make some URLs inaccessible.
+
 *cancel*
 	Exits URL mode without opening an URL. Default: _Control+g
 	Control+c Control+d Escape_.
@@ -789,7 +792,7 @@ mode. The syntax is exactly the same as the regular **key-bindings**.
 	This action toggles between showing and hiding the URL on the jump
 	label.
 	
-	Default: _t_.
+	Default: _Control+t_.
 
 
 # SECTION: mouse-bindings

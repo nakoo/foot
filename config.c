@@ -2830,7 +2830,7 @@ add_default_url_bindings(struct config *conf)
         {BIND_ACTION_URL_CANCEL, m_ctrl, XKB_KEY_g},
         {BIND_ACTION_URL_CANCEL, m_ctrl, XKB_KEY_d},
         {BIND_ACTION_URL_CANCEL, m_none, XKB_KEY_Escape},
-        {BIND_ACTION_URL_TOGGLE_URL_ON_JUMP_LABEL, m_none, XKB_KEY_t},
+        {BIND_ACTION_URL_TOGGLE_URL_ON_JUMP_LABEL, m_ctrl, XKB_KEY_t},
     };
 
     conf->bindings.url.count = ALEN(bindings);

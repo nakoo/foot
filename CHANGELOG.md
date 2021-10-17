@@ -49,6 +49,8 @@
   `double-width` to `wcswidth`.
 * INSTALL.md: `--override tweak.grapheme-shaping=no` added to PGO
   command line.
+* url-mode: default key binding for `toggle-url-visible` changed from
+  `t` to `Control+t`.
 
 
 ### Deprecated
