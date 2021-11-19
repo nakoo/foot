@@ -53,6 +53,8 @@
 * Regression: `pipe-*` key bindings not being parsed correctly,
   resulting in invalid error messages
   (https://codeberg.org/dnkl/foot/issues/809).
+* Incorrect handling of one OSC-8 URI overwriting another OSC-8 URI
+  (https://codeberg.org/dnkl/foot/issues/801).
 
 
 ### Security

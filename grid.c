@@ -848,11 +848,129 @@ void
 grid_row_add_uri_range(struct row *row, struct row_uri_range range)
 {
     ensure_row_has_extra_data(row);
+
+    /* Handle overlapping URIs */
+    tll_foreach(row->extra->uri_ranges, it) {
+        struct row_uri_range *old = &it->item;
+
+        if (range.start <= old->start && range.end >= old->end) {
+            /* New URI replaces old URI completely */
+            grid_row_uri_range_destroy(old);
+            tll_remove(row->extra->uri_ranges, it);
+        }
+
+        else if (range.start > old->start && range.end < old->end) {
+            /* New URI replaces a part in the middle of the old URI */
+            struct row_uri_range old_tail = {
+                .start = range.end + 1,
+                .end = old->end,
+                .id = old->id,
+                .uri = old->uri != NULL ? xstrdup(old->uri) : NULL,
+            };
+            tll_insert_after(row->extra->uri_ranges, it, old_tail);
+            old->end = range.start - 1;
+            break;  /* There can be no more overlapping URIs */
+        }
+
+        else if (range.start <= old->end && range.end >= old->end) {
+            /* New URI replaces the tail of the old URI */
+            xassert(range.end >= old->end);
+            old->end = range.start - 1;
+        }
+
+        else if (range.start <= old->start && range.end >= old->start) {
+            /* New URI replaces the head of the old URI */
+            xassert(range.start <= old->start);
+            old->start = range.end + 1;
+            break;  /* There can be no more overlapping URIs */
+        }
+    }
+
     tll_rforeach(row->extra->uri_ranges, it) {
         if (it->item.end < range.start) {
             tll_insert_after(row->extra->uri_ranges, it, range);
             return;
         }
     }
+
     tll_push_front(row->extra->uri_ranges, range);
+}
+
+UNITTEST
+{
+    struct row_data row_data = {.uri_ranges = tll_init()};
+    struct row row = {.extra = &row_data};
+
+#define row_has_no_overlapping_uris(row)                                \
+    do {                                                                \
+        tll_foreach((row)->extra->uri_ranges, it1) {                    \
+            tll_foreach((row)->extra->uri_ranges, it2) {                \
+                if (&it1->item == &it2->item)                           \
+                    continue;                                           \
+                xassert(it1->item.start != it2->item.start);            \
+                xassert(it1->item.start != it2->item.end);              \
+                xassert(it1->item.end != it2->item.start);              \
+                xassert(it1->item.end != it2->item.end);                \
+            }                                                           \
+        }                                                               \
+    } while (0)
+
+    grid_row_add_uri_range(&row, (struct row_uri_range){1, 10});
+    xassert(tll_length(row_data.uri_ranges) == 1);
+    xassert(tll_front(row_data.uri_ranges).start == 1);
+    xassert(tll_front(row_data.uri_ranges).end == 10);
+    row_has_no_overlapping_uris(&row);
+
+    grid_row_add_uri_range(&row, (struct row_uri_range){11, 20});
+    xassert(tll_length(row_data.uri_ranges) == 2);
+    xassert(tll_back(row_data.uri_ranges).start == 11);
+    xassert(tll_back(row_data.uri_ranges).end == 20);
+    row_has_no_overlapping_uris(&row);
+
+    /* Add URI that completely covers both the old rows */
+    grid_row_add_uri_range(&row, (struct row_uri_range){1, 20});
+    xassert(tll_length(row_data.uri_ranges) == 1);
+    xassert(tll_front(row_data.uri_ranges).start == 1);
+    xassert(tll_front(row_data.uri_ranges).end == 20);
+    row_has_no_overlapping_uris(&row);
+
+    /* One more URI, directly after the previous one */
+    grid_row_add_uri_range(&row, (struct row_uri_range){21, 30});
+
+    /* This URI covers second half of the first URI, and first half of
+     * the second URI */
+    grid_row_add_uri_range(&row, (struct row_uri_range){5, 25});
+    xassert(tll_length(row_data.uri_ranges) == 3);
+    xassert(tll_front(row_data.uri_ranges).start == 1);
+    xassert(tll_front(row_data.uri_ranges).end == 4);
+    xassert(tll_back(row_data.uri_ranges).start == 26);
+    xassert(tll_back(row_data.uri_ranges).end == 30);
+    row_has_no_overlapping_uris(&row);
+
+    /* This URI splits the second of the three pre-existing URIs in
+     * the middle */
+    grid_row_add_uri_range(&row, (struct row_uri_range){11, 20});
+    xassert(tll_length(row_data.uri_ranges) == 5);
+    row_has_no_overlapping_uris(&row);
+
+    xassert(tll_front(row_data.uri_ranges).start == 1);
+    xassert(tll_front(row_data.uri_ranges).end == 4);
+    tll_pop_front(row_data.uri_ranges);
+    xassert(tll_front(row_data.uri_ranges).start == 5);
+    xassert(tll_front(row_data.uri_ranges).end == 10);
+    tll_pop_front(row_data.uri_ranges);
+    xassert(tll_front(row_data.uri_ranges).start == 11);
+    xassert(tll_front(row_data.uri_ranges).end == 20);
+    tll_pop_front(row_data.uri_ranges);
+    xassert(tll_front(row_data.uri_ranges).start == 21);
+    xassert(tll_front(row_data.uri_ranges).end == 25);
+    tll_pop_front(row_data.uri_ranges);
+    xassert(tll_front(row_data.uri_ranges).start == 26);
+    xassert(tll_front(row_data.uri_ranges).end == 30);
+    tll_pop_front(row_data.uri_ranges);
+    xassert(tll_length(row_data.uri_ranges) == 0);
+
+#undef row_has_no_overlapping_uris
+
+    tll_free(row_data.uri_ranges);
 }
