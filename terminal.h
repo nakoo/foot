@@ -289,6 +289,13 @@ struct terminal {
     const struct config *conf;
 
     void (*ascii_printer)(struct terminal *term, wchar_t c);
+    struct {
+        void (*to)(struct terminal *term, int row, int col);
+        void (*left)(struct terminal *term, int count);
+        void (*right)(struct terminal *term, int count);
+        void (*up)(struct terminal *term, int count);
+        void (*down)(struct terminal *term, int count);
+    } cursor_move;
 
     pid_t slave;
     int ptmx;
@@ -696,11 +703,23 @@ void term_erase_scrollback(struct terminal *term);
 
 int term_row_rel_to_abs(const struct terminal *term, int row);
 void term_cursor_home(struct terminal *term);
-void term_cursor_to(struct terminal *term, int row, int col);
-void term_cursor_left(struct terminal *term, int count);
-void term_cursor_right(struct terminal *term, int count);
-void term_cursor_up(struct terminal *term, int count);
-void term_cursor_down(struct terminal *term, int count);
+
+static inline void term_cursor_to(struct terminal *term, int row, int col) {
+    term->cursor_move.to(term, row, col);
+}
+static inline void term_cursor_left(struct terminal *term, int count) {
+    term->cursor_move.left(term, count);
+}
+static inline void term_cursor_right(struct terminal *term, int count) {
+    term->cursor_move.right(term, count);
+}
+static inline void term_cursor_up(struct terminal *term, int count) {
+    term->cursor_move.up(term, count);
+}
+static inline void term_cursor_down(struct terminal *term, int count) {
+    term->cursor_move.down(term, count);
+}
+
 void term_cursor_blink_update(struct terminal *term);
 
 void term_print(struct terminal *term, wchar_t wc, int width);

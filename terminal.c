@@ -58,6 +58,9 @@ const char *const XCURSOR_RIGHT_SIDE = "right_side";
 const char *const XCURSOR_TOP_SIDE = "top_side";
 const char *const XCURSOR_BOTTOM_SIDE = "bottom_side";
 
+static void term_set_cursor_move_normal(struct terminal *term);
+static void term_set_cursor_move_osc8(struct terminal *term);
+
 static void
 enqueue_data_for_slave(const void *data, size_t len, size_t offset,
                        ptmx_buffer_list_t *buffer_list)
@@ -1223,7 +1226,8 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
 #endif
     };
 
-   term_update_ascii_printer(term);
+    term_update_ascii_printer(term);
+    term_set_cursor_move_normal(term);
 
     for (size_t i = 0; i < 4; i++) {
         const struct config_font_list *font_list = &conf->fonts[i];
@@ -1851,6 +1855,7 @@ term_reset(struct terminal *term, bool hard)
 #endif
 
     term_update_ascii_printer(term);
+    term_set_cursor_move_normal(term);
 
     if (!hard)
         return;
@@ -2348,61 +2353,159 @@ term_row_rel_to_abs(const struct terminal *term, int row)
 }
 
 void
-term_cursor_to(struct terminal *term, int row, int col)
-{
-    xassert(row < term->rows);
-    xassert(col < term->cols);
-
-    term->grid->cursor.lcf = false;
-
-    term->grid->cursor.point.col = col;
-    term->grid->cursor.point.row = row;
-
-    term->grid->cur_row = grid_row(term->grid, row);
-}
-
-void
 term_cursor_home(struct terminal *term)
 {
     term_cursor_to(term, term_row_rel_to_abs(term, 0), 0);
 }
 
-void
-term_cursor_left(struct terminal *term, int count)
+static void
+cursor_to(struct terminal *term, int row, int col)
 {
-    int move_amount = min(term->grid->cursor.point.col, count);
-    term->grid->cursor.point.col -= move_amount;
-    xassert(term->grid->cursor.point.col >= 0);
-    term->grid->cursor.lcf = false;
+    xassert(row < term->rows);
+    xassert(col < term->cols);
+
+    struct grid *grid = term->grid;
+
+    grid->cursor.lcf = false;
+    grid->cursor.point.col = col;
+    grid->cursor.point.row = row;
+    grid->cur_row = grid_row(grid, row);
 }
 
-void
-term_cursor_right(struct terminal *term, int count)
+static void
+cursor_to_osc8(struct terminal *term, int row, int col)
 {
-    int move_amount = min(term->cols - term->grid->cursor.point.col - 1, count);
-    term->grid->cursor.point.col += move_amount;
-    xassert(term->grid->cursor.point.col < term->cols);
-    term->grid->cursor.lcf = false;
+    xassert(row < term->rows);
+    xassert(col < term->cols);
+    xassert(term->vt.osc8.begin.row >= 0);
+
+    struct grid *grid = term->grid;
+
+    char *osc8_uri = xstrdup(term->vt.osc8.uri);
+    uint64_t osc8_id = term->vt.osc8.id;
+
+    term_osc8_close(term);
+    grid->cursor.lcf = false;
+    grid->cursor.point.col = col;
+    grid->cursor.point.row = row;
+    grid->cur_row = grid_row(grid, row);
+    term_osc8_open(term, osc8_id, osc8_uri);
+    free(osc8_uri);
 }
 
-void
-term_cursor_up(struct terminal *term, int count)
+static void
+cursor_left(struct terminal *term, int count)
 {
+    struct grid *grid = term->grid;
+    const int move_amount = min(grid->cursor.point.col, count);
+    grid->cursor.point.col -= move_amount;
+    xassert(grid->cursor.point.col >= 0);
+    grid->cursor.lcf = false;
+}
+
+static void
+cursor_left_osc8(struct terminal *term, int count)
+{
+    struct grid *grid = term->grid;
+    const int move_amount = min(grid->cursor.point.col, count);
+    cursor_to_osc8(
+        term,
+        grid->cursor.point.row,
+        grid->cursor.point.col - move_amount);
+}
+
+static void
+cursor_right(struct terminal *term, int count)
+{
+    struct grid *grid = term->grid;
+    const int move_amount = min(term->cols - grid->cursor.point.col - 1, count);
+    grid->cursor.point.col += move_amount;
+    xassert(grid->cursor.point.col < term->cols);
+    grid->cursor.lcf = false;
+}
+
+static void
+cursor_right_osc8(struct terminal *term, int count)
+{
+    struct grid *grid = term->grid;
+    int move_amount = min(term->cols - grid->cursor.point.col - 1, count);
+    cursor_to_osc8(
+        term,
+        grid->cursor.point.row,
+        grid->cursor.point.col + move_amount);
+}
+
+static void
+cursor_up(struct terminal *term, int count)
+{
+    struct grid *grid = term->grid;
+
     int top = term->origin == ORIGIN_ABSOLUTE ? 0 : term->scroll_region.start;
-    xassert(term->grid->cursor.point.row >= top);
+    xassert(grid->cursor.point.row >= top);
 
-    int move_amount = min(term->grid->cursor.point.row - top, count);
-    term_cursor_to(term, term->grid->cursor.point.row - move_amount, term->grid->cursor.point.col);
+    int move_amount = min(grid->cursor.point.row - top, count);
+    term_cursor_to(
+        term, grid->cursor.point.row - move_amount, grid->cursor.point.col);
 }
 
-void
-term_cursor_down(struct terminal *term, int count)
+static void
+cursor_up_osc8(struct terminal *term, int count)
 {
-    int bottom = term->origin == ORIGIN_ABSOLUTE ? term->rows : term->scroll_region.end;
-    xassert(bottom >= term->grid->cursor.point.row);
+    struct grid *grid = term->grid;
 
-    int move_amount = min(bottom - term->grid->cursor.point.row - 1, count);
-    term_cursor_to(term, term->grid->cursor.point.row + move_amount, term->grid->cursor.point.col);
+    int top = term->origin == ORIGIN_ABSOLUTE ? 0 : term->scroll_region.start;
+    xassert(grid->cursor.point.row >= top);
+
+    int move_amount = min(grid->cursor.point.row - top, count);
+    cursor_to_osc8(
+        term, grid->cursor.point.row - move_amount, grid->cursor.point.col);
+}
+
+static void
+cursor_down(struct terminal *term, int count)
+{
+    struct grid *grid = term->grid;
+
+    int bottom = term->origin == ORIGIN_ABSOLUTE ? term->rows : term->scroll_region.end;
+    xassert(bottom >= grid->cursor.point.row);
+
+    int move_amount = min(bottom - grid->cursor.point.row - 1, count);
+    cursor_to(term, grid->cursor.point.row + move_amount, grid->cursor.point.col);
+}
+
+static void
+cursor_down_osc8(struct terminal *term, int count)
+{
+    struct grid *grid = term->grid;
+
+    int bottom = term->origin == ORIGIN_ABSOLUTE ? term->rows : term->scroll_region.end;
+    xassert(bottom >= grid->cursor.point.row);
+
+    int move_amount = min(bottom - grid->cursor.point.row - 1, count);
+    cursor_to_osc8(
+        term, grid->cursor.point.row + move_amount, grid->cursor.point.col);
+}
+
+static void
+term_set_cursor_move_normal(struct terminal *term)
+{
+    LOG_DBG("disabling OSC-8 aware cursor movements");
+    term->cursor_move.to = &cursor_to;
+    term->cursor_move.left = &cursor_left;
+    term->cursor_move.right = &cursor_right;
+    term->cursor_move.up = &cursor_up;
+    term->cursor_move.down = &cursor_down;
+}
+
+static void
+term_set_cursor_move_osc8(struct terminal *term)
+{
+    LOG_DBG("enabling OSC-8 aware cursor movements");
+    term->cursor_move.to = &cursor_to_osc8;
+    term->cursor_move.left = &cursor_left_osc8;
+    term->cursor_move.right = &cursor_right_osc8;
+    term->cursor_move.up = &cursor_up_osc8;
+    term->cursor_move.down = &cursor_down_osc8;
 }
 
 static bool
@@ -3505,11 +3608,15 @@ term_osc8_open(struct terminal *term, uint64_t id, const char *uri)
     };
     term->vt.osc8.id = id;
     term->vt.osc8.uri = xstrdup(uri);
+
+    term_set_cursor_move_osc8(term);
 }
 
 void
 term_osc8_close(struct terminal *term)
 {
+    term_set_cursor_move_normal(term);
+
     if (term->vt.osc8.begin.row < 0)
         return;
 
