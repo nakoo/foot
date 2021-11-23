@@ -3572,3 +3572,78 @@ done:
     term->vt.osc8.uri = NULL;
     term->vt.osc8.begin = (struct coord){-1, -1};
 }
+
+UNITTEST
+{
+    const int num_rows = 16;
+    const int num_cols = 40;
+    struct row *rows[num_rows];
+
+    for (int i = 0; i < num_rows; i++) {
+        rows[i] = calloc(1, sizeof(struct row));
+        rows[i]->cells = calloc(num_cols, sizeof(struct cell));
+    }
+
+    struct config conf = {
+        .url = {.osc8_underline = OSC8_UNDERLINE_URL_MODE},
+    };
+
+    struct terminal term = {
+        .conf = &conf,
+        .rows = num_rows,
+        .cols = num_cols,
+        .normal = {
+            .num_rows = num_rows,
+            .num_cols = num_cols,
+            .cursor = {
+                .point = {.row = 1, .col = 2},
+            },
+            .rows = rows,
+            .cur_row = rows[1],
+        },
+        .vt = {
+            .osc8 = {
+                .begin = (struct coord){-1, -1},
+            },
+        },
+    };
+    term.grid = &term.normal;
+
+    term_osc8_open(&term, 123, "http://foo.bar");
+    term_cursor_to(&term, 1, 4);
+    term_osc8_close(&term);
+    xassert(term.normal.cur_row->extra == NULL);
+
+    term_osc8_open(&term, 456, "http://1234.com");
+    term_print(&term, L'A', 1);
+    term_cursor_to(&term, 1, 10);
+    term_print(&term, L'B', 1);
+    term_osc8_close(&term);
+
+    xassert(term.normal.rows[1]->extra != NULL);
+    xassert(tll_length(term.normal.rows[1]->extra->uri_ranges) == 2);
+
+    {
+        const struct row_uri_range *range = &tll_front(
+            term.normal.rows[1]->extra->uri_ranges);
+        xassert(range->start == 4);
+        xassert(range->end == 4);
+
+        range = &tll_back(
+            term.normal.rows[1]->extra->uri_ranges);
+        xassert(range->start == 10);
+        xassert(range->end == 10);
+    }
+
+    for (int i = 0; i < num_rows; i++) {
+        if (rows[i]->extra != NULL) {
+            tll_foreach(rows[i]->extra->uri_ranges, it) {
+                free(it->item.uri);
+                tll_remove(rows[i]->extra->uri_ranges, it);
+            }
+        }
+        free(rows[i]->extra);
+        free(rows[i]->cells);
+        free(rows[i]);
+    }
+}
