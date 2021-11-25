@@ -3363,7 +3363,6 @@ ascii_printer_fast(struct terminal *term, wchar_t wc)
     cell->wc = term->vt.last_printed = wc;
     cell->attrs = term->vt.attrs;
 
-
     /* Advance cursor */
     if (unlikely(++col >= term->cols)) {
         grid->cursor.lcf = true;
@@ -3602,10 +3601,16 @@ term_osc8_open(struct terminal *term, uint64_t id, const char *uri)
 
     xassert(term->vt.osc8.uri == NULL);
 
-    term->vt.osc8.begin = (struct coord){
-        .col = term->grid->cursor.point.col,
-        .row = grid_row_absolute(term->grid, term->grid->cursor.point.row),
-    };
+    struct grid *grid = term->grid;
+    int col = grid->cursor.point.col;
+    int row = grid_row_absolute(grid, grid->cursor.point.row);
+
+    if (grid->cursor.lcf) {
+        row = (row + 1) & (grid->num_rows - 1);
+        col = 0;
+    }
+
+    term->vt.osc8.begin = (struct coord){.col = col, .row = row};
     term->vt.osc8.id = id;
     term->vt.osc8.uri = xstrdup(uri);
 
@@ -3623,11 +3628,17 @@ term_osc8_close(struct terminal *term)
     if (term->vt.osc8.uri[0] == '\0')
         goto done;
 
+    struct grid *grid = term->grid;
+    int col = grid->cursor.point.col;
+    int row = grid_row_absolute(grid, grid->cursor.point.row);
+
+    if (grid->cursor.lcf) {
+        row = (row + 1) % (grid->num_rows - 1);
+        col = 0;
+    }
+
     struct coord start = term->vt.osc8.begin;
-    struct coord end = (struct coord){
-        .col = term->grid->cursor.point.col,
-        .row = grid_row_absolute(term->grid, term->grid->cursor.point.row),
-    };
+    struct coord end = (struct coord){col, row};
 
     if (start.row == end.row && start.col == end.col) {
         /* Zero-length URL, e.g: \E]8;;http://foo\E\\\E]8;;\E\\ */
@@ -3645,7 +3656,7 @@ term_osc8_close(struct terminal *term)
     while (true) {
         int end_col = r == end.row ? end.col : term->cols - 1;
 
-        struct row *row = term->grid->rows[r];
+        struct row *row = grid->rows[r];
 
         switch (term->conf->url.osc8_underline) {
         case OSC8_UNDERLINE_ALWAYS:
@@ -3670,7 +3681,7 @@ term_osc8_close(struct terminal *term)
             break;
 
         r++;
-        r &= term->grid->num_rows - 1;
+        r &= grid->num_rows - 1;
     }
 
 done:
