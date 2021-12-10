@@ -52,9 +52,12 @@
 ## Unreleased
 ### Added
 
+- Support for opening an existing PTY, e.g. a VM console.
+  ([#1564][1564])
 * Unicode input mode now accepts input from the numpad as well,
   numlock is ignored.
 
+[1564]: https://codeberg.org/dnkl/foot/pulls/1564
 
 ### Changed
 
