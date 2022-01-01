@@ -38,7 +38,12 @@
 
 
 ## Unreleased
+
 ### Added
+
+* OSC-22 - set xcursor pointer.
+
+
 ### Changed
 ### Deprecated
 ### Removed
