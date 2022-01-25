@@ -55,7 +55,10 @@
   - `DECSTBM` - _Set Top and Bottom Margins_
   - `SGR` - _Set Graphic Rendition_
   - `DECSCUSR` - _Set Cursor Style_
-
+ * Copy and Paste keycodes are supported by default for the clipboard. These
+   are useful for keyboards with custom firmware like QMK to enable global
+   copy/paste shortcuts that work inside and outside the terminal.
+   (https://codeberg.org/dnkl/foot/pulls/894)
 
 ### Changed
 
@@ -101,12 +104,13 @@
 * Wrong mouse binding triggered when doing two mouse selections in
   very quick (< 300ms) succession
   (https://codeberg.org/dnkl/foot/issues/883).
-
+* deprecated `bell` option was removed from foot.ini (https://codeberg.org/dnkl/foot/pulls/893)
 
 ### Security
 ### Contributors
 
 * [lamonte](https://codeberg.org/lamonte)
+* [markstos](https://codeberg.org/markstos)
 
 ## 1.10.3
 
