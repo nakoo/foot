@@ -38,7 +38,15 @@
 
 
 ## Unreleased
+
 ### Added
+
+* `-Dtests=false|true` meson command line option. When disabled, test
+  binaries will neither be built, nor will `ninja test` attempt to
+  execute them. Enabled by default
+  (https://codeberg.org/dnkl/foot/issues/919).
+
+
 ### Changed
 ### Deprecated
 ### Removed
