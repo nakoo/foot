@@ -530,6 +530,13 @@ osc_notify(struct terminal *term, char *string)
 void
 osc_dispatch(struct terminal *term)
 {
+    if (term->vt.osc.idx > 0 && term->vt.osc.data[0] == 'l') {
+        const char *str = (const char *)term->vt.osc.data;
+        LOG_DBG("OSC: %.*s (prefix = 'l')", (int)term->vt.osc.idx, str);
+        term_set_window_title(term, str + 1);
+        return;
+    }
+
     unsigned param = 0;
     int data_ofs = 0;
 
