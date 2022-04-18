@@ -1,13 +1,17 @@
-[Service]
-ExecStart=@bindir@/foot --server=0
-Environment=WAYLAND_DISPLAY=%i
-NonBlocking=true
-StandardInput=socket
-
 [Unit]
-Requires=%N.socket
 Description=Foot terminal server mode for WAYLAND_DISPLAY=%i
 Documentation=man:foot(1)
+PartOf=graphical-session.target
+After=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+
+[Service]
+ExecStart=@bindir@/foot --server=0
+Environment="WAYLAND_DISPLAY=%i"
+NonBlocking=true
+StandardInput=socket
+Restart=on-failure
 
 [Install]
-WantedBy=wayland-instance@.target
+Also=%N.socket
+WantedBy=graphical-session.target

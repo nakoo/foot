@@ -1,5 +1,8 @@
+[Unit]
+Description=Foot server socket
+
 [Socket]
 ListenStream=%t/foot-%i.sock
 
 [Install]
-WantedBy=wayland-instance@.target
+WantedBy=sockets.target
