@@ -171,28 +171,6 @@ void get_current_modifiers(const struct seat *seat,
                            xkb_mod_mask_t *effective,
                            xkb_mod_mask_t *consumed, uint32_t key) {}
 
-static struct key_binding_set kbd;
-static bool kbd_initialized = false;
-
-struct key_binding_set *
-key_binding_for(
-    struct key_binding_manager *mgr, const struct terminal *term,
-    const struct seat *seat)
-{
-    if (!kbd_initialized) {
-        kbd_initialized = true;
-        kbd = (struct key_binding_set){
-            .key = tll_init(),
-            .search = tll_init(),
-            .url = tll_init(),
-            .mouse = tll_init(),
-            .selection_overrides = 0,
-        };
-    }
-
-    return &kbd;
-}
-
 int
 main(int argc, const char *const *argv)
 {
