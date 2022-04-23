@@ -198,11 +198,6 @@ key_binding_new_for_term(
     }
 }
 
-void
-key_binding_unref_term(struct key_binding_manager *mgr, const struct terminal *term)
-{
-}
-
 int
 main(int argc, const char *const *argv)
 {
