@@ -4,3 +4,4 @@
 
 void cmd_scrollback_up(struct terminal *term, int rows);
 void cmd_scrollback_down(struct terminal *term, int rows);
+void cmd_scrollback_clear_keepcur(struct terminal *term);

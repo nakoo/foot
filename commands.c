@@ -113,3 +113,17 @@ cmd_scrollback_down(struct terminal *term, int rows)
     render_refresh_urls(term);
     render_refresh(term);
 }
+
+void
+cmd_scrollback_clear_keepcur(struct terminal *term) {
+    const struct coord cursor = term->grid->cursor.point;
+    int real_row = grid_row_absolute(term->grid, cursor.row - 1);
+    struct row *row;
+    while (row = term->grid->rows[real_row], row && !row->linebreak)
+        real_row = (real_row - 1) & (term->grid->num_rows - 1);
+    int screen_row = (real_row + 1 - term->grid->offset) & (term->grid->num_rows - 1);
+    term_scroll_partial(term, (struct scroll_region){0, term->rows}, screen_row);
+    term_cursor_to(term, cursor.row - screen_row, cursor.col);
+    term_erase_scrollback(term);
+    render_refresh(term);
+}

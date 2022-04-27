@@ -778,6 +778,10 @@ e.g. *search-start=none*.
 *scrollback-end*
 	Scroll to the end (bottom) of the scrollback. Default: _none_.
 
+*scrollback-clear-keepcur*
+	Clear scrollback, keeping only the line currently being edited. Might break
+	applications that do not expect it. Default: _not bound_.
+
 *clipboard-copy*
 	Copies the current selection into the _clipboard_. Default: _Control+Shift+c_
 	_XF86Copy_.

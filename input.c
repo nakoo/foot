@@ -168,6 +168,13 @@ execute_binding(struct seat *seat, struct terminal *term,
         }
         break;
 
+    case BIND_ACTION_SCROLLBACK_CLEAR_KEEPCUR:
+        if (term->grid == &term->normal) {
+            cmd_scrollback_clear_keepcur(term);
+            return true;
+        }
+        break;
+
     case BIND_ACTION_CLIPBOARD_COPY:
         selection_to_clipboard(seat, term, serial);
         return true;
