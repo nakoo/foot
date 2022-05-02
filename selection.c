@@ -812,13 +812,16 @@ selection_update(struct terminal *term, int col, int row)
         struct coord *pivot_end = &term->selection.pivot.end;
 
         if (term->selection.kind == SELECTION_BLOCK) {
-            if (new_end.col > pivot_start->col)
-                new_direction = SELECTION_RIGHT;
-            else
+            if (new_end.col < pivot_start->col)
                 new_direction = SELECTION_LEFT;
+            else if (new_end.col > pivot_start->col || new_direction == SELECTION_LEFT)
+                new_direction = SELECTION_RIGHT;
 
-            if (term->selection.direction == SELECTION_UNDIR)
+            if (term->selection.direction == SELECTION_UNDIR &&
+                new_end.col != new_start.col)
+            {
                 set_pivot_point_for_block_and_char_wise(term, *pivot_start, new_direction);
+            }
 
             if (new_direction == SELECTION_LEFT)
                 new_start = *pivot_end;
