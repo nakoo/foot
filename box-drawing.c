@@ -15,8 +15,6 @@
 #include "util.h"
 #include "xmalloc.h"
 
-#define clamp(x, lower, upper) (min(upper, max(x, lower)))
-
 enum thickness {
     LIGHT,
     HEAVY,
@@ -1281,17 +1279,17 @@ draw_box_drawings_light_arc(struct buf *buf, char32_t wc)
      * The general idea here is to connect the two incoming lines using a
      * circle, which is extended to the box-edges with vertical/horizontal
      * lines.
-     * 
+     *
      * The radius of the quartercircle should be as big as possible, with some
      * restrictions: The radius should be the same for all of ╭ ╮ ╯ ╰ at a
      * given box-size (which won't be the case if we choose the biggest
      * possible radius for a given box, consider the following:)
-     * 
-     * 
+     *
+     *
      * ▕  ███   ▏
-     * ▕a  │   d▔▔ 
-     * ▕   │  x 
-     * ▕   │    
+     * ▕a  │   d▔▔
+     * ▕   │  x
+     * ▕   │
      * ▕   │    ██
      * ▕   ╰────██
      * ▕        ██
@@ -1302,7 +1300,7 @@ draw_box_drawings_light_arc(struct buf *buf, char32_t wc)
      * for ╰ it would be possible to center the circle on the upper right
      * corner of d, but we have set it on x instead because ╯ can only use a
      * 2px inner radius:
-     * 
+     *
      *  ▕  ███   ▏
      * ▔▔a  │   d▏
      *   x  │    ▏

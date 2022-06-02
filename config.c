@@ -1190,7 +1190,7 @@ parse_section_colors(struct context *ctx)
             return false;
         }
 
-        conf->colors.alpha = alpha * 65535.;
+        conf->colors.alpha = alpha * UINT16_MAX;
         return true;
     }
 

@@ -2005,17 +2005,22 @@ term_font_size_reset(struct terminal *term)
     return load_fonts_from_conf(term);
 }
 
+#define ALPHA_STEP (0.05 * UINT16_MAX)
 bool
 term_alpha_increase(struct terminal *term)
 {
-    term->colors.alpha += 0.05;
+    term->colors.alpha = clamp(term->colors.alpha + ALPHA_STEP, 0, UINT16_MAX);
+    term->render.last_buf = NULL;
+    render_refresh(term);
     return true;
 }
 
 bool
 term_alpha_decrease(struct terminal *term)
 {
-    term->colors.alpha -= 0.05;
+    term->colors.alpha = clamp(term->colors.alpha - ALPHA_STEP, 0, UINT16_MAX);
+    term->render.last_buf = NULL;
+    render_refresh(term);
     return true;
 }
 
