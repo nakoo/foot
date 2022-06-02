@@ -178,6 +178,18 @@ execute_binding(struct seat *seat, struct terminal *term,
         term_font_size_reset(term);
         return true;
 
+    case BIND_ACTION_ALPHA_UP:
+        term_alpha_increase(term);
+        return true;
+
+    case BIND_ACTION_ALPHA_DOWN:
+        term_alpha_decrease(term);
+        return true;
+
+    case BIND_ACTION_ALPHA_RESET:
+        term_alpha_reset(term);
+        return true;
+
     case BIND_ACTION_SPAWN_TERMINAL:
         term_spawn_new(term);
         return true;

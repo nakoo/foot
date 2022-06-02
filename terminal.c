@@ -2006,6 +2006,27 @@ term_font_size_reset(struct terminal *term)
 }
 
 bool
+term_alpha_increase(struct terminal *term)
+{
+    term->colors.alpha += 0.05;
+    return true;
+}
+
+bool
+term_alpha_decrease(struct terminal *term)
+{
+    term->colors.alpha -= 0.05;
+    return true;
+}
+
+bool
+term_alpha_reset(struct terminal *term)
+{
+    term->colors.alpha = term->conf->colors.alpha;
+    return true;
+}
+
+bool
 term_font_dpi_changed(struct terminal *term, int old_scale)
 {
     float dpi = get_font_dpi(term);

@@ -692,6 +692,9 @@ bool term_paste_data_to_slave(
 bool term_font_size_increase(struct terminal *term);
 bool term_font_size_decrease(struct terminal *term);
 bool term_font_size_reset(struct terminal *term);
+bool term_alpha_increase(struct terminal *term);
+bool term_alpha_decrease(struct terminal *term);
+bool term_alpha_reset(struct terminal *term);
 bool term_font_dpi_changed(struct terminal *term, int old_scale);
 void term_font_subpixel_changed(struct terminal *term);
 
