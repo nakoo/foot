@@ -2010,7 +2010,8 @@ bool
 term_alpha_increase(struct terminal *term)
 {
     term->colors.alpha = clamp(term->colors.alpha + ALPHA_STEP, 0, UINT16_MAX);
-    term->render.last_buf = NULL;
+    term_damage_view(term);
+    term_damage_margins(term);
     render_refresh(term);
     return true;
 }
@@ -2019,7 +2020,8 @@ bool
 term_alpha_decrease(struct terminal *term)
 {
     term->colors.alpha = clamp(term->colors.alpha - ALPHA_STEP, 0, UINT16_MAX);
-    term->render.last_buf = NULL;
+    term_damage_view(term);
+    term_damage_margins(term);
     render_refresh(term);
     return true;
 }
@@ -2028,10 +2030,12 @@ bool
 term_alpha_reset(struct terminal *term)
 {
     term->colors.alpha = term->conf->colors.alpha;
-    term->render.last_buf = NULL;
+    term_damage_view(term);
+    term_damage_margins(term);
     render_refresh(term);
     return true;
 }
+#undef ALPHA_STEP
 
 bool
 term_font_dpi_changed(struct terminal *term, int old_scale)
