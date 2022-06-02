@@ -2028,6 +2028,8 @@ bool
 term_alpha_reset(struct terminal *term)
 {
     term->colors.alpha = term->conf->colors.alpha;
+    term->render.last_buf = NULL;
+    render_refresh(term);
     return true;
 }
 
