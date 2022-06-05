@@ -715,10 +715,10 @@ e.g. *search-start=none*.
 	Resets the font size to the default. Default: _Control+0 Control+KP\_0_.
 
 *alpha-increase*
-	Increases alpha by 5%. Default: _not_bound_.
+	Increases alpha by 5 percentage points. Default: _not_bound_.
 
 *alpha-decrease*
-	Decreases alpha by 5%. Default: _not_bound_.
+	Decreases alpha by 5 percentage points. Default: _not_bound_.
 
 *alpha-reset*
 	Resets alpha to the default. Default: _not_bound_.
