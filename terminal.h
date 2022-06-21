@@ -31,6 +31,17 @@ enum color_source {
     COLOR_RGB,
 };
 
+#if FOOT_EXT_UNDERLINE
+enum underline_style {
+    UNDERLINE_NONE,
+    UNDERLINE_STRAIGHT,
+    UNDERLINE_CURLY,
+    UNDERLINE_DOUBLE,
+    UNDERLINE_DASHED,
+    UNDERLINE_DOTTED,
+};
+#endif
+
 /*
  *  Note: we want the cells to be as small as possible. Larger cells
  *  means fewer scrollback lines (or performance drops due to cache
@@ -56,8 +67,19 @@ struct attributes {
     bool selected:1;
     bool url:1;
     uint32_t bg:24;
+
+#if FOOT_EXT_UNDERLINE
+	enum underline_style ul_style:4;
+	enum color_source ul_src:4;
+	uint32_t ul:24;
+#endif
 };
+
+#if FOOT_EXT_UNDERLINE
+static_assert(sizeof(struct attributes) == 12, "VT attribute struct too large");
+#else
 static_assert(sizeof(struct attributes) == 8, "VT attribute struct too large");
+#endif
 
 /* Last valid Unicode code point is 0x0010FFFFul */
 #define CELL_COMB_CHARS_LO          0x00200000ul
@@ -68,7 +90,11 @@ struct cell {
     char32_t wc;
     struct attributes attrs;
 };
+#if FOOT_EXT_UNDERLINE
+static_assert(sizeof(struct cell) == 16, "bad size");
+#else
 static_assert(sizeof(struct cell) == 12, "bad size");
+#endif
 
 struct scroll_region {
     int start;

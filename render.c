@@ -384,6 +384,99 @@ draw_underline(const struct terminal *term, pixman_image_t *pix,
             x, y + y_ofs, cols * term->cell_width, thickness});
 }
 
+#if FOOT_EXT_UNDERLINE
+static void
+draw_ext_underline(const struct terminal *term, pixman_image_t *pix,
+                      const struct fcft_font *font,
+                      const pixman_color_t *color,
+                      const enum underline_style style,
+                      int x, int y, int cols)
+{
+    if (style == UNDERLINE_NONE)
+        return;
+    const int thickness = font->underline.thickness;
+
+    int y_ofs;
+    /* Make sure the line isn't positioned below the cell */
+    switch (style) {
+    case UNDERLINE_DOUBLE:
+        y_ofs = min(underline_offset(term, font),
+                    term->cell_height - thickness * 3);
+        break;
+    default:
+        y_ofs = min(underline_offset(term, font),
+                    term->cell_height - thickness);
+        break;
+    }
+
+    const int ceil_w = cols * term->cell_width;
+    switch (style) {
+    case UNDERLINE_DOUBLE: {
+        const pixman_rectangle16_t rects[] = {
+            {x, y + y_ofs, ceil_w, thickness},
+            {x, y + y_ofs + thickness * 2, ceil_w, thickness}};
+        pixman_image_fill_rectangles(PIXMAN_OP_SRC, pix, color, 2, rects);
+        break;
+    }
+    case UNDERLINE_DASHED: {
+        const int ceil_w = cols * term->cell_width;
+        const int dash_w = ceil_w / 3 + (ceil_w % 3 > 0);
+        const pixman_rectangle16_t rects[] = {
+            {x, y + y_ofs, dash_w, thickness},
+            {x + dash_w * 2, y + y_ofs, dash_w, thickness},
+        };
+        pixman_image_fill_rectangles(
+            PIXMAN_OP_SRC, pix, color, 2, rects);
+        break;
+    }
+    case UNDERLINE_DOTTED: {
+        const int ceil_w = cols * term->cell_width;
+        const int nrects = min(ceil_w / thickness / 2, 16);
+        pixman_rectangle16_t rects[16] = {0};
+        for (int i = 0; i < nrects; i++) {
+            rects[i] = (pixman_rectangle16_t){
+                x + i * thickness * 2, y + y_ofs, thickness, thickness};
+        }
+        pixman_image_fill_rectangles(
+            PIXMAN_OP_SRC, pix, color, nrects, rects);
+        break;
+    }
+    case UNDERLINE_CURLY: {
+#define I(x) pixman_int_to_fixed(x)
+        const int top = y + y_ofs;
+        const int bot = top + thickness * 3;
+        const int th = thickness;
+        const int half_x = x + ceil_w / 2, full_x = x + ceil_w;
+        const pixman_trapezoid_t traps[] = {
+            {
+                I(top), I(bot),
+                {{I(x), I(bot - th)}, {I(half_x), I(top - th)}},
+                {{I(x), I(bot + th)}, {I(half_x), I(top + th)}},
+            },
+            {
+                I(top), I(bot),
+                {{I(half_x), I(top + th)}, {I(full_x), I(bot + th)}},
+                {{I(half_x), I(top - th)}, {I(full_x), I(bot - th)}},
+            }};
+        // TODO: reuse the fill across all cells
+        pixman_image_t *fill = pixman_image_create_solid_fill(color);
+        pixman_composite_trapezoids(
+            PIXMAN_OP_OVER, fill, pix, PIXMAN_a8, 0, 0, 0, 0, 2, traps);
+        pixman_image_unref(fill);
+        break;
+    }
+    default: {
+        const pixman_rectangle16_t rects[] = {
+            {x, y + y_ofs, ceil_w, thickness}};
+        pixman_image_fill_rectangles(
+            PIXMAN_OP_SRC, pix, color, 1, rects);
+        break;
+    }
+    }
+}
+#endif
+
+
 static void
 draw_strikeout(const struct terminal *term, pixman_image_t *pix,
                const struct fcft_font *font,
@@ -478,12 +571,18 @@ render_cell(struct terminal *term, pixman_image_t *pix, pixman_region32_t *damag
 
     uint32_t _fg = 0;
     uint32_t _bg = 0;
+#if FOOT_EXT_UNDERLINE
+    uint32_t _ul = 0;
+#endif
 
     uint16_t alpha = 0xffff;
 
     if (is_selected && term->colors.use_custom_selection) {
         _fg = term->colors.selection_fg;
         _bg = term->colors.selection_bg;
+#if FOOT_EXT_UNDERLINE
+        _ul = _fg;
+#endif
     } else {
         /* Use cell specific color, if set, otherwise the default colors (possible reversed) */
         switch (cell->attrs.fg_src) {
@@ -517,6 +616,24 @@ render_cell(struct terminal *term, pixman_image_t *pix, pixman_region32_t *damag
             _bg = term->reverse ? term->colors.fg : term->colors.bg;
             break;
         }
+
+#if FOOT_EXT_UNDERLINE
+        switch (cell->attrs.ul_src) {
+        case COLOR_RGB:
+            _ul = cell->attrs.ul;
+            break;
+
+        case COLOR_BASE16:
+        case COLOR_BASE256:
+            xassert(cell->attrs.ul < ALEN(term->colors.table));
+            _ul = term->colors.table[cell->attrs.bg];
+            break;
+
+        case COLOR_DEFAULT:
+            _ul = _fg;
+            break;
+        }
+#endif
 
         if (cell->attrs.reverse ^ is_selected) {
             uint32_t swap = _fg;
@@ -581,6 +698,9 @@ render_cell(struct terminal *term, pixman_image_t *pix, pixman_region32_t *damag
 
     pixman_color_t fg = color_hex_to_pixman(_fg);
     pixman_color_t bg = color_hex_to_pixman_with_alpha(_bg, alpha);
+#if FOOT_EXT_UNDERLINE
+    pixman_color_t ul = color_hex_to_pixman(_ul);
+#endif
 
     struct fcft_font *font = attrs_to_font(term, &cell->attrs);
     const struct composed *composed = NULL;
@@ -834,8 +954,13 @@ render_cell(struct terminal *term, pixman_image_t *pix, pixman_region32_t *damag
     pixman_image_unref(clr_pix);
 
     /* Underline */
+#if FOOT_EXT_UNDERLINE
+    draw_ext_underline(term, pix, font, &ul, cell->attrs.ul_style,
+                       x, y, cell_cols);
+#else
     if (cell->attrs.underline)
         draw_underline(term, pix, font, &fg, x, y, cell_cols);
+#endif
 
     if (cell->attrs.strikethrough)
         draw_strikeout(term, pix, font, &fg, x, y, cell_cols);

@@ -88,17 +88,44 @@ csi_sgr(struct terminal *term)
         case 1: term->vt.attrs.bold = true; break;
         case 2: term->vt.attrs.dim = true; break;
         case 3: term->vt.attrs.italic = true; break;
-        case 4: term->vt.attrs.underline = true; break;
+        case 4: {
+#if FOOT_EXT_UNDERLINE
+            const struct vt_subparams p = term->vt.params.v[i].sub;
+            struct attributes *attr = &term->vt.attrs;
+            if (p.idx == 0) {
+                attr->ul_style = UNDERLINE_STRAIGHT;
+                break;
+            }
+            switch (p.value[0]) {
+            case 0: attr->ul_style = UNDERLINE_NONE; break;
+            case 1: attr->ul_style = UNDERLINE_STRAIGHT; break;
+            case 2: attr->ul_style = UNDERLINE_DOUBLE; break;
+            case 3: attr->ul_style = UNDERLINE_CURLY; break;
+            case 4: attr->ul_style = UNDERLINE_DOTTED; break;
+            case 5: attr->ul_style = UNDERLINE_DASHED; break;
+            }
+#else
+            term->vt.attrs.underline = true;
+#endif
+            break;
+        }
         case 5: term->vt.attrs.blink = true; break;
         case 6: LOG_WARN("ignored: rapid blink"); break;
         case 7: term->vt.attrs.reverse = true; break;
         case 8: term->vt.attrs.conceal = true; break;
         case 9: term->vt.attrs.strikethrough = true; break;
-
+#if FOOT_EXT_UNDERLINE
+        case 21: term->vt.attrs.ul_style = UNDERLINE_DOUBLE; break;
+#else
         case 21: break; /* double-underline, not implemented */
+#endif
         case 22: term->vt.attrs.bold = term->vt.attrs.dim = false; break;
         case 23: term->vt.attrs.italic = false; break;
+#if FOOT_EXT_UNDERLINE
+        case 24: term->vt.attrs.ul_style = UNDERLINE_NONE; break;
+#else
         case 24: term->vt.attrs.underline = false; break;
+#endif
         case 25: term->vt.attrs.blink = false; break;
         case 26: break;  /* rapid blink, ignored */
         case 27: term->vt.attrs.reverse = false; break;
@@ -119,6 +146,9 @@ csi_sgr(struct terminal *term)
             break;
 
         case 38:
+#if FOOT_EXT_UNDERLINE
+        case 58:
+#endif
         case 48: {
             uint32_t color;
             enum color_source src;
@@ -197,17 +227,29 @@ csi_sgr(struct terminal *term)
             if (param == 38) {
                 term->vt.attrs.fg_src = src;
                 term->vt.attrs.fg = color;
+#if FOOT_EXT_UNDERLINE
+            } else if (param == 58) {
+                term->vt.attrs.ul_src = src;
+                term->vt.attrs.ul = color;
+#endif
             } else {
                 xassert(param == 48);
                 term->vt.attrs.bg_src = src;
                 term->vt.attrs.bg = color;
             }
             break;
+
         }
 
         case 39:
             term->vt.attrs.fg_src = COLOR_DEFAULT;
             break;
+
+#if FOOT_EXT_UNDERLINE
+        case 59:
+            term->vt.attrs.ul_src = COLOR_DEFAULT;
+            break;
+#endif
 
         /* Regular background colors */
         case 40:
