@@ -231,6 +231,10 @@ default) available; see *foot.ini*(5).
 	Same as *ctrl*+*w*, except that the only word separating
 	characters are whitespace characters.
 
+*ctrl*+*l*
+	Extend current selection (and thus the search criteria) to the end
+	of the line.
+
 *ctrl*+*v*, *ctrl*+*shift*+*v*, *ctrl*+*y*, *XF86Paste*
 	Paste from clipboard into the search buffer.
 

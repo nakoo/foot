@@ -81,5 +81,8 @@ void selection_find_word_boundary_right(
     struct terminal *term, struct coord *pos, bool spaces_only,
     bool stop_on_space_to_word_boundary);
 
+void selection_find_line_boundary_right(
+    struct terminal *term, struct coord *pos);
+
 struct coord selection_get_start(const struct terminal *term);
 struct coord selection_get_end(const struct terminal *term);

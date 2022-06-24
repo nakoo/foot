@@ -851,6 +851,10 @@ scrollback search mode. The syntax is exactly the same as the regular
 	Extend the current selection to the next whitespace. Default:
 	_Control+Shift+w_.
 
+*extend-to-end-line*
+	Extend current selection to the end of the line. Default:
+	_Control+l_.
+
 *clipboard-paste*
 	Paste from the _clipboard_ into the search buffer. Default:
 	_Control+v Control+y_.

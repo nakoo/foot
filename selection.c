@@ -459,8 +459,7 @@ selection_find_word_boundary_right(struct terminal *term, struct coord *pos,
 }
 
 void
-selection_find_line_boundary_left(struct terminal *term, struct coord *pos,
-                                  bool spaces_only)
+selection_find_line_boundary_left(struct terminal *term, struct coord *pos)
 {
     int next_row = pos->row;
     pos->col = 0;
@@ -481,8 +480,7 @@ selection_find_line_boundary_left(struct terminal *term, struct coord *pos,
 }
 
 void
-selection_find_line_boundary_right(struct terminal *term, struct coord *pos,
-                                   bool spaces_only)
+selection_find_line_boundary_right(struct terminal *term, struct coord *pos)
 {
     int next_row = pos->row;
     pos->col = term->cols - 1;
@@ -547,8 +545,8 @@ selection_start(struct terminal *term, int col, int row,
 
     case SELECTION_LINE_WISE: {
         struct coord start = {0, row}, end = {term->cols - 1, row};
-        selection_find_line_boundary_left(term, &start, spaces_only);
-        selection_find_line_boundary_right(term, &end, spaces_only);
+        selection_find_line_boundary_left(term, &start);
+        selection_find_line_boundary_right(term, &end);
 
         term->selection.coords.start = (struct coord){
             start.col, term->grid->view + start.row};
@@ -889,7 +887,7 @@ selection_update(struct terminal *term, int col, int row)
         case SELECTION_LEFT: {
             struct coord end = {0, row};
             selection_find_line_boundary_left(
-                term, &end, term->selection.spaces_only);
+                term, &end);
             new_end = (struct coord){end.col, term->grid->view + end.row};
             break;
         }
@@ -897,7 +895,7 @@ selection_update(struct terminal *term, int col, int row)
         case SELECTION_RIGHT: {
             struct coord end = {col, row};
             selection_find_line_boundary_right(
-                term, &end, term->selection.spaces_only);
+                term, &end);
             new_end = (struct coord){end.col, term->grid->view + end.row};
             break;
         }
@@ -1040,8 +1038,8 @@ selection_extend_normal(struct terminal *term, int col, int row,
         struct coord pivot_start = {new_start.col, new_start.row - term->grid->view};
         struct coord pivot_end = pivot_start;
 
-        selection_find_line_boundary_left(term, &pivot_start, spaces_only);
-        selection_find_line_boundary_right(term, &pivot_end, spaces_only);
+        selection_find_line_boundary_left(term, &pivot_start);
+        selection_find_line_boundary_right(term, &pivot_end);
 
         term->selection.pivot.start =
             (struct coord){pivot_start.col, term->grid->view + pivot_start.row};

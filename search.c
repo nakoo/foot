@@ -643,7 +643,7 @@ search_add_chars(struct terminal *term, const char *src, size_t count)
 }
 
 static void
-search_match_to_end_of_word(struct terminal *term, bool spaces_only)
+search_match_to_end_of_object(struct terminal *term, bool spaces_only, bool line)
 {
     if (term->search.match_len == 0)
         return;
@@ -683,10 +683,14 @@ search_match_to_end_of_word(struct terminal *term, bool spaces_only)
     xassert(new_end.row < grid->num_rows);
     xassert(grid->rows[new_end.row] != NULL);
 
-    /* Find next word boundary */
+    /* Find next word/line boundary */
     new_end.row -= grid->view + grid->num_rows;
     new_end.row &= grid->num_rows - 1;
-    selection_find_word_boundary_right(term, &new_end, spaces_only, false);
+    if (!line) {
+        selection_find_word_boundary_right(term, &new_end, spaces_only, false);
+    } else {
+        selection_find_line_boundary_right(term, &new_end);
+    }
     new_end.row += grid->view;
     new_end.row &= grid->num_rows - 1;
 
@@ -967,13 +971,19 @@ execute_binding(struct seat *seat, struct terminal *term,
     }
 
     case BIND_ACTION_SEARCH_EXTEND_WORD:
-        search_match_to_end_of_word(term, false);
+        search_match_to_end_of_object(term, false, false);
         *update_search_result = false;
         *redraw = true;
         return true;
 
     case BIND_ACTION_SEARCH_EXTEND_WORD_WS:
-        search_match_to_end_of_word(term, true);
+        search_match_to_end_of_object(term, true, false);
+        *update_search_result = false;
+        *redraw = true;
+        return true;
+
+    case BIND_ACTION_SEARCH_EXTEND_LINE:
+        search_match_to_end_of_object(term, false, true);
         *update_search_result = false;
         *redraw = true;
         return true;

@@ -146,6 +146,7 @@ static const char *const search_binding_action_map[] = {
     [BIND_ACTION_SEARCH_DELETE_NEXT_WORD] = "delete-next-word",
     [BIND_ACTION_SEARCH_EXTEND_WORD] = "extend-to-word-boundary",
     [BIND_ACTION_SEARCH_EXTEND_WORD_WS] = "extend-to-next-whitespace",
+    [BIND_ACTION_SEARCH_EXTEND_LINE] = "extend-to-end-line",
     [BIND_ACTION_SEARCH_CLIPBOARD_PASTE] = "clipboard-paste",
     [BIND_ACTION_SEARCH_PRIMARY_PASTE] = "primary-paste",
 };
@@ -2705,6 +2706,7 @@ add_default_search_bindings(struct config *conf)
         {BIND_ACTION_SEARCH_DELETE_NEXT_WORD, m_alt, {{XKB_KEY_d}}},
         {BIND_ACTION_SEARCH_EXTEND_WORD, m_ctrl, {{XKB_KEY_w}}},
         {BIND_ACTION_SEARCH_EXTEND_WORD_WS, m_ctrl_shift, {{XKB_KEY_w}}},
+        {BIND_ACTION_SEARCH_EXTEND_LINE, m_ctrl, {{XKB_KEY_l}}},
         {BIND_ACTION_SEARCH_CLIPBOARD_PASTE, m_ctrl, {{XKB_KEY_v}}},
         {BIND_ACTION_SEARCH_CLIPBOARD_PASTE, m_ctrl_shift, {{XKB_KEY_v}}},
         {BIND_ACTION_SEARCH_CLIPBOARD_PASTE, m_ctrl, {{XKB_KEY_y}}},
