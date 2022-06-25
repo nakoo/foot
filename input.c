@@ -1572,6 +1572,18 @@ keyboard_key(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
              uint32_t time, uint32_t key, uint32_t state)
 {
     struct seat *seat = data;
+
+    if (unlikely(seat->kbd_focus == NULL)) {
+        LOG_WARN(
+            "compositor sent 'keyboard key %s' event on seat %s "
+            "without a prior 'keyboard enter' event",
+            (state == WL_KEYBOARD_KEY_STATE_PRESSED
+             ? "pressed"
+             : "released"),
+            seat->name);
+        return;
+    }
+
     key_press_release(seat, seat->kbd_focus, serial, key + 8, state);
 }
 
