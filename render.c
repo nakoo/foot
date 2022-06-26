@@ -400,6 +400,7 @@ draw_ext_underline(const struct terminal *term, pixman_image_t *pix,
     /* Make sure the line isn't positioned below the cell */
     switch (style) {
     case UNDERLINE_DOUBLE:
+    case UNDERLINE_CURLY:
         y_ofs = min(underline_offset(term, font),
                     term->cell_height - thickness * 3);
         break;
@@ -458,7 +459,6 @@ draw_ext_underline(const struct terminal *term, pixman_image_t *pix,
                 {{I(half_x), I(top + th)}, {I(full_x), I(bot + th)}},
                 {{I(half_x), I(top - th)}, {I(full_x), I(bot - th)}},
             }};
-        // TODO: reuse the fill across all cells
         pixman_image_t *fill = pixman_image_create_solid_fill(color);
         pixman_composite_trapezoids(
             PIXMAN_OP_OVER, fill, pix, PIXMAN_a8, 0, 0, 0, 0, 2, traps);
