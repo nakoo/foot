@@ -4,6 +4,7 @@
 #include <wctype.h>
 #include <unistd.h>
 #include <signal.h>
+#include <math.h>
 
 #include <sys/ioctl.h>
 #include <sys/time.h>
@@ -443,11 +444,16 @@ draw_ext_underline(const struct terminal *term, pixman_image_t *pix,
         break;
     }
     case UNDERLINE_CURLY: {
-#define I(x) pixman_int_to_fixed(x)
         const int top = y + y_ofs;
         const int bot = top + thickness * 3;
-        const int th = thickness;
-        const int half_x = x + ceil_w / 2, full_x = x + ceil_w;
+        const int half_x = x + ceil_w / 2.0, full_x = x + ceil_w;
+
+        const double bt_2 = (bot - top) * (bot - top);
+        const double th_2 = thickness * thickness;
+        const double hx_2 = ceil_w * ceil_w / 4.0;
+        const int th = round(sqrt(th_2 + (th_2 * bt_2 / hx_2)) / 2.);
+
+#define I(x) pixman_int_to_fixed(x)
         const pixman_trapezoid_t traps[] = {
             {
                 I(top), I(bot),
