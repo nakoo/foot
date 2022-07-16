@@ -2,4 +2,4 @@
 ListenStream=%t/foot-%i.sock
 
 [Install]
-WantedBy=wayland-instance@.target
+WantedBy=graphical-session.target
