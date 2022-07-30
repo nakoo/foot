@@ -28,5 +28,5 @@ option('utmp-backend', type: 'combo', value: 'auto', choices: ['none', 'libutemp
 option('utmp-default-helper-path', type: 'string', value: 'auto',
        description: 'Default path to the utmp helper binary. Default: auto-detect')
 
-option('ext-underline', type: 'boolean', value: true,
+option('ext-underline', type: 'boolean', value: false,
       description: 'Enable underline styles & colors from xterm-kitty')
