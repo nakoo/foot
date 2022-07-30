@@ -388,10 +388,10 @@ draw_underline(const struct terminal *term, pixman_image_t *pix,
 #if FOOT_EXT_UNDERLINE
 static void
 draw_ext_underline(const struct terminal *term, pixman_image_t *pix,
-                      const struct fcft_font *font,
-                      const pixman_color_t *color,
-                      const enum underline_style style,
-                      int x, int y, int cols)
+                   const struct fcft_font *font,
+                   const pixman_color_t *color,
+                   const enum underline_style style,
+                   int x, int y, int cols)
 {
     if (style == UNDERLINE_NONE)
         return;
