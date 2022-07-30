@@ -159,6 +159,8 @@ m*.
 :  Conceal; text is not visible, but is copiable
 |  9
 :  Crossed-out/strike
+|  21
+:  Double underline (requires ext-underline feature)
 |  22
 :  Disable *bold* and *dim*
 |  23
@@ -185,6 +187,10 @@ m*.
 :  See "indexed and RGB colors" below
 |  49
 :  Use the default background color (*background* in *foot.ini*(5))
+|  58
+:  See "indexed and RGB colors" below
+|  59
+:  Set underline color to foreground (requires ext-underline feature)
 |  90-97
 :  Select foreground color (using *brightN* in *foot.ini*(5))
 |  100-107
@@ -594,6 +600,35 @@ manipulation sequences. The generic format is:
 :  <unnamed>
 :  kitty
 :  Update current Kitty keyboard flags, according to _mode_.
+|  \\E[ 4 : 0 m
+:  <unnamed>
+:  kitty
+:  Disable underline (requires ext-underline feature).
+|  \\E[ 4 : 1 m
+:  <unnamed>
+:  kitty
+:  Set the underline style to a straight
+   (requires ext-underline feature).
+|  \\E[ 4 : 2 m
+:  <unnamed>
+:  kitty
+:  Set the underline style to a double
+   (requires ext-underline feature).
+|  \\E[ 4 : 3 m
+:  <unnamed>
+:  kitty
+:  Set the underline style to a curly
+   (requires ext-underline feature).
+|  \\E[ 4 : 4 m
+:  <unnamed>
+:  kitty
+:  Set the underline style to a dotted
+   (requires ext-underline feature).
+|  \\E[ 4 : 5 m
+:  <unnamed>
+:  kitty
+:  Set the underline style to a dashed
+   (requires ext-underline feature).
 
 
 # OSC

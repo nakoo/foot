@@ -452,7 +452,6 @@ draw_ext_underline(const struct terminal *term, pixman_image_t *pix,
         const double th_2 = thickness * thickness;
         const double hx_2 = ceil_w * ceil_w / 4.0;
         const int th = round(sqrt(th_2 + (th_2 * bt_2 / hx_2)) / 2.);
-
 #define I(x) pixman_int_to_fixed(x)
         const pixman_trapezoid_t traps[] = {
             {
