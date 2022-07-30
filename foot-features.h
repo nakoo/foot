@@ -37,3 +37,12 @@ static inline bool feature_graphemes(void)
     return false;
 #endif
 }
+
+static inline bool feature_ext_underline(void)
+{
+#if FOOT_EXT_UNDERLINE
+    return true;
+#else
+    return false;
+#endif
+}
