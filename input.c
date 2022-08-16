@@ -198,6 +198,25 @@ execute_binding(struct seat *seat, struct terminal *term,
         term_font_size_reset(term);
         return true;
 
+    case BIND_ACTION_ALPHA_UP:
+        term_alpha_set(term,
+                clamp(term->colors.alpha + 0.05 * UINT16_MAX, 0, UINT16_MAX));
+        return true;
+
+    case BIND_ACTION_ALPHA_DOWN:
+        term_alpha_set(term,
+                clamp(term->colors.alpha - 0.05 * UINT16_MAX, 0, UINT16_MAX));
+        return true;
+
+    case BIND_ACTION_ALPHA_RESET:
+        term_alpha_set(term, term->conf->colors.alpha);
+        return true;
+
+    case BIND_ACTION_ALPHA_TOGGLE:
+        term_alpha_set(term, term->colors.alpha == UINT16_MAX
+            ? term->conf->colors.alpha : UINT16_MAX);
+        return true;
+
     case BIND_ACTION_SPAWN_TERMINAL:
         term_spawn_new(term);
         return true;

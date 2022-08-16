@@ -104,6 +104,10 @@ static const char *const binding_action_map[] = {
     [BIND_ACTION_FONT_SIZE_UP] = "font-increase",
     [BIND_ACTION_FONT_SIZE_DOWN] = "font-decrease",
     [BIND_ACTION_FONT_SIZE_RESET] = "font-reset",
+    [BIND_ACTION_ALPHA_UP] = "alpha-increase",
+    [BIND_ACTION_ALPHA_DOWN] = "alpha-decrease",
+    [BIND_ACTION_ALPHA_RESET] = "alpha-reset",
+    [BIND_ACTION_ALPHA_TOGGLE] = "alpha-toggle",
     [BIND_ACTION_SPAWN_TERMINAL] = "spawn-terminal",
     [BIND_ACTION_MINIMIZE] = "minimize",
     [BIND_ACTION_MAXIMIZE] = "maximize",
@@ -1293,7 +1297,7 @@ parse_section_colors(struct context *ctx)
             return false;
         }
 
-        conf->colors.alpha = alpha * 65535.;
+        conf->colors.alpha = alpha * UINT16_MAX;
         return true;
     }
 

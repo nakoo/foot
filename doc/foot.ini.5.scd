@@ -803,6 +803,18 @@ e.g. *search-start=none*.
 *font-reset*
 	Resets the font size to the default. Default: _Control+0 Control+KP\_0_.
 
+*alpha-increase*
+	Increases alpha by 5 percentage points. Default: _not_bound_.
+
+*alpha-decrease*
+	Decreases alpha by 5 percentage points. Default: _not_bound_.
+
+*alpha-reset*
+	Resets alpha to the default. Default: _not_bound_.
+
+*alpha-toggle*
+	Toggles alpha between 100% and the default. Default: _not_bound_.
+
 *spawn-terminal*
 	Spawns a new terminal. If the shell has been configured to emit
 	the OSC 7 escape sequence, the new terminal will start in the

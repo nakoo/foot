@@ -15,8 +15,6 @@
 #include "util.h"
 #include "xmalloc.h"
 
-#define clamp(x, lower, upper) (min(upper, max(x, lower)))
-
 enum thickness {
     LIGHT,
     HEAVY,

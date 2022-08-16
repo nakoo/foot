@@ -2081,6 +2081,15 @@ term_font_size_reset(struct terminal *term)
     return load_fonts_from_conf(term);
 }
 
+void
+term_alpha_set(struct terminal *term, uint16_t alpha)
+{
+    term->colors.alpha = alpha;
+    term_damage_margins(term);
+    wayl_win_alpha_changed(term->window);
+    term_font_subpixel_changed(term);
+}
+
 bool
 term_fractional_scaling(const struct terminal *term)
 {
