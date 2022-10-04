@@ -206,6 +206,12 @@ struct seat {
         uint32_t serial;
     } ime;
 #endif
+
+    struct {
+        bool active;
+        int count;
+        char32_t character;
+    } unicode_mode;
 };
 
 enum csd_surface {
@@ -332,6 +338,11 @@ struct wl_window {
         int move_timeout_fd;
         uint32_t serial;
     } csd;
+
+    struct {
+        bool maximize:1;
+        bool minimize:1;
+    } wm_capabilities;
 
     struct wl_surf_subsurf search;
     struct wl_surf_subsurf scrollback_indicator;

@@ -1,5 +1,5 @@
 project('foot', 'c',
-        version: '1.12.1',
+        version: '1.13.1',
         license: 'MIT',
         meson_version: '>=0.58.0',
         default_options: [
@@ -16,9 +16,30 @@ if cc.has_function('memfd_create')
   add_project_arguments('-DMEMFD_CREATE', language: 'c')
 endif
 
+utempter_path = get_option('default-utempter-path')
+if utempter_path == ''
+  utempter = find_program(
+    'utempter',
+    required: false,
+    dirs: [join_paths(get_option('prefix'), get_option('libdir'), 'utempter'),
+           join_paths(get_option('prefix'), get_option('libexecdir'), 'utempter'),
+           '/usr/lib/utempter',
+           '/usr/libexec/utempter',
+           '/lib/utempter']
+  )
+  if utempter.found()
+    utempter_path = utempter.full_path()
+  else
+    utempter_path = ''
+  endif
+elif utempter_path == 'none'
+  utempter_path = ''
+endif
+
 add_project_arguments(
   ['-D_GNU_SOURCE=200809L',
-   '-DFOOT_DEFAULT_TERM="@0@"'.format(get_option('default-terminfo'))] +
+   '-DFOOT_DEFAULT_TERM="@0@"'.format(get_option('default-terminfo')),
+   '-DFOOT_DEFAULT_UTEMPTER_PATH="@0@"'.format(utempter_path)] +
   (is_debug_build
     ? ['-D_DEBUG']
    : [cc.get_supported_arguments('-fno-asynchronous-unwind-tables')]) +
@@ -222,6 +243,7 @@ executable(
   'slave.c', 'slave.h',
   'spawn.c', 'spawn.h',
   'tokenize.c', 'tokenize.h',
+  'unicode-mode.c', 'unicode-mode.h',
   'url-mode.c', 'url-mode.h',
   'user-notification.c', 'user-notification.h',
   'wayland.c', 'wayland.h', 'shm-formats.h',
@@ -243,7 +265,7 @@ executable(
   install: true)
 
 install_data(
-  'foot.desktop', 'foot-server.desktop', 'footclient.desktop',
+  'org.codeberg.dnkl.foot.desktop', 'org.codeberg.dnkl.foot-server.desktop', 'org.codeberg.dnkl.footclient.desktop',
   install_dir: join_paths(get_option('datadir'), 'applications'))
 
 systemd = dependency('systemd', required: false)
@@ -320,6 +342,7 @@ summary(
     'Themes': get_option('themes'),
     'IME': get_option('ime'),
     'Grapheme clustering': utf8proc.found(),
+    'Utempter path': utempter_path,
     'Build terminfo': tic.found(),
     'Terminfo install location': terminfo_install_location,
     'Default TERM': get_option('default-terminfo'),

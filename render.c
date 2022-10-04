@@ -372,7 +372,10 @@ draw_underline(const struct terminal *term, pixman_image_t *pix,
                const struct fcft_font *font,
                const pixman_color_t *color, int x, int y, int cols)
 {
-    const int thickness = font->underline.thickness;
+    const int thickness = term->conf->underline_thickness.px >= 0
+        ? term_pt_or_px_as_pixels(
+            term, &term->conf->underline_thickness)
+        : font->underline.thickness;
 
     /* Make sure the line isn't positioned below the cell */
     const int y_ofs = min(underline_offset(term, font),
@@ -699,7 +702,7 @@ render_cell(struct terminal *term, pixman_image_t *pix,
         mtx_unlock(&term->render.workers.lock);
     }
 
-    if (has_cursor && term->cursor_style == CURSOR_BLOCK && term->kbd_focus)
+    if (unlikely(has_cursor && term->cursor_style == CURSOR_BLOCK && term->kbd_focus))
         draw_cursor(term, cell, font, pix, &fg, &bg, x, y, cell_cols);
 
     if (cell->wc == 0 || cell->wc >= CELL_SPACER || cell->wc == U'\t' ||
@@ -1011,6 +1014,13 @@ grid_render_scroll(struct terminal *term, struct buffer *buf,
     wl_surface_damage_buffer(
         term->window->surface, term->margins.left, dst_y,
         term->width - term->margins.left - term->margins.right, height);
+
+    /*
+     * TODO: remove this if re-enabling scroll damage when re-applying
+     * last frame’s damage (see reapply_old_damage()
+     */
+    pixman_region32_union_rect(
+        &buf->dirty, &buf->dirty, 0, dst_y, buf->width, height);
 }
 
 static void
@@ -1076,6 +1086,13 @@ grid_render_scroll_reverse(struct terminal *term, struct buffer *buf,
     wl_surface_damage_buffer(
         term->window->surface, term->margins.left, dst_y,
         term->width - term->margins.left - term->margins.right, height);
+
+    /*
+     * TODO: remove this if re-enabling scroll damage when re-applying
+     * last frame’s damage (see reapply_old_damage()
+     */
+    pixman_region32_union_rect(
+        &buf->dirty, &buf->dirty, 0, dst_y, buf->width, height);
 }
 
 static void
@@ -1466,10 +1483,21 @@ static void
 render_overlay(struct terminal *term)
 {
     struct wl_surf_subsurf *overlay = &term->window->overlay;
+    bool unicode_mode_active = false;
+
+    /* Check if unicode mode is active on at least one seat focusing
+     * this terminal instance */
+    tll_foreach(term->wl->seats, it) {
+        if (it->item.unicode_mode.active) {
+            unicode_mode_active = true;
+            break;
+        }
+    }
 
     const enum overlay_style style =
         term->is_searching ? OVERLAY_SEARCH :
         term->flash.active ? OVERLAY_FLASH :
+        unicode_mode_active ? OVERLAY_UNICODE_MODE :
         OVERLAY_NONE;
 
     if (likely(style == OVERLAY_NONE)) {
@@ -1488,9 +1516,21 @@ render_overlay(struct terminal *term)
 
     pixman_image_set_clip_region32(buf->pix[0], NULL);
 
-    pixman_color_t color = style == OVERLAY_SEARCH
-        ? (pixman_color_t){0, 0, 0, 0x7fff}
-        : (pixman_color_t){.red=0x7fff, .green=0x7fff, .blue=0, .alpha=0x7fff};
+    pixman_color_t color;
+
+    switch (style) {
+    case OVERLAY_NONE:
+        break;
+
+    case OVERLAY_SEARCH:
+    case OVERLAY_UNICODE_MODE:
+        color = (pixman_color_t){0, 0, 0, 0x7fff};
+        break;
+
+    case OVERLAY_FLASH:
+        color = (pixman_color_t){.red=0x7fff, .green=0x7fff, .blue=0, .alpha=0x7fff};
+        break;
+    }
 
     /* Bounding rectangle of damaged areas - for wl_surface_damage_buffer() */
     pixman_box32_t damage_bounds;
@@ -1517,17 +1557,18 @@ render_overlay(struct terminal *term)
          * region that needs to be *cleared* in this frame.
          *
          * Finally, the union of the two “diff” regions above, gives
-         * us the total region affecte by a change, in either way. We
+         * us the total region affected by a change, in either way. We
          * use this as the bounding box for the
          * wl_surface_damage_buffer() call.
          */
         pixman_region32_t *see_through = &term->render.last_overlay_clip;
         pixman_region32_t old_see_through;
+        const bool buffer_reuse =
+            buf == term->render.last_overlay_buf &&
+            style == term->render.last_overlay_style &&
+            buf->age == 0;
 
-        if (!(buf == term->render.last_overlay_buf &&
-              style == term->render.last_overlay_style &&
-              buf->age == 0))
-        {
+        if (!buffer_reuse) {
             /* Can’t re-use last frame’s damage - set to full window,
              * to ensure *everything* is updated */
             pixman_region32_init_rect(
@@ -1540,8 +1581,8 @@ render_overlay(struct terminal *term)
 
         pixman_region32_clear(see_through);
 
+        /* Build region consisting of all current search matches */
         struct search_match_iterator iter = search_matches_new_iter(term);
-
         for (struct range match = search_matches_next(&iter);
              match.start.row >= 0;
              match = search_matches_next(&iter))
@@ -1569,20 +1610,28 @@ render_overlay(struct terminal *term)
             }
         }
 
-        /* Current see-through, minus old see-through - aka cells that
-         * need to be cleared */
+        /* Areas that need to be cleared: cells that were dimmed in
+         * the last frame but is now see-through */
         pixman_region32_t new_see_through;
         pixman_region32_init(&new_see_through);
-        pixman_region32_subtract(&new_see_through, see_through, &old_see_through);
+
+        if (buffer_reuse)
+            pixman_region32_subtract(&new_see_through, see_through, &old_see_through);
+        else {
+            /* Buffer content is unknown - explicitly clear *all*
+             * current see-through areas */
+            pixman_region32_copy(&new_see_through, see_through);
+        }
         pixman_image_set_clip_region32(buf->pix[0], &new_see_through);
 
-        /* Old see-through, minus new see-through - aka cells that
-         * needs to be dimmed */
+        /* Areas that need to be dimmed: cells that were cleared in
+         * the last frame but is not anymore */
         pixman_region32_t new_dimmed;
         pixman_region32_init(&new_dimmed);
         pixman_region32_subtract(&new_dimmed, &old_see_through, see_through);
         pixman_region32_fini(&old_see_through);
 
+        /* Total affected area */
         pixman_region32_t damage;
         pixman_region32_init(&damage);
         pixman_region32_union(&damage, &new_see_through, &new_dimmed);
@@ -1605,7 +1654,7 @@ render_overlay(struct terminal *term)
     else if (buf == term->render.last_overlay_buf &&
              style == term->render.last_overlay_style)
     {
-        xassert(style == OVERLAY_FLASH);
+        xassert(style == OVERLAY_FLASH || style == OVERLAY_UNICODE_MODE);
         shm_did_not_use_buf(buf);
         return;
     } else {
@@ -1726,10 +1775,12 @@ get_csd_data(const struct terminal *term, enum csd_surface surf_idx)
     const int button_close_width = term->width >= 1 * button_width
         ? button_width : 0;
 
-    const int button_maximize_width = term->width >= 2 * button_width
+    const int button_maximize_width =
+        term->width >= 2 * button_width && term->window->wm_capabilities.maximize
         ? button_width : 0;
 
-    const int button_minimize_width = term->width >= 3 * button_width
+    const int button_minimize_width =
+        term->width >= 3 * button_width && term->window->wm_capabilities.minimize
         ? button_width : 0;
 
     switch (surf_idx) {
@@ -2510,22 +2561,27 @@ reapply_old_damage(struct terminal *term, struct buffer *new, struct buffer *old
         return;
     }
 
-    /*
-     * TODO: remove this frame’s damage from the region we copy from
-     * the old frame.
-     *
-     * - this frame’s dirty region is only valid *after* we’ve applied
-     *   its scroll damage.
-     * - last frame’s dirty region is only valid *before* we’ve
-     *   applied this frame’s scroll damage.
-     *
-     * Can we transform one of the regions? It’s not trivial, since
-     * scroll damage isn’t just about counting lines; there may be
-     * multiple damage records, each with different scrolling regions.
-     */
     pixman_region32_t dirty;
     pixman_region32_init(&dirty);
 
+    /*
+     * Figure out current frame’s damage region
+     *
+     * If current frame doesn’t have any scroll damage, we can simply
+     * subtract this frame’s damage from the last frame’s damage. That
+     * way, we don’t have to copy areas from the old frame that’ll
+     * just get overwritten by current frame.
+     *
+     * Note that this is row based. A “half damaged” row is not
+     * excluded. I.e. the entire row will be copied from the old frame
+     * to the new, and then when actually rendering the new frame, the
+     * updated cells will overwrite parts of the copied row.
+     *
+     * Since we’re scanning the entire viewport anyway, we also track
+     * whether *all* cells are to be updated. In this case, just force
+     * a full re-rendering, and don’t copy anything from the old
+     * frame.
+     */
     bool full_repaint_needed = true;
 
     for (int r = 0; r < term->rows; r++) {
@@ -2555,35 +2611,31 @@ reapply_old_damage(struct terminal *term, struct buffer *new, struct buffer *old
         return;
     }
 
-    for (size_t i = 0; i < old->scroll_damage_count; i++) {
-        const struct damage *dmg = &old->scroll_damage[i];
-
-        switch (dmg->type) {
-        case DAMAGE_SCROLL:
-            if (term->grid->view == term->grid->offset)
-                grid_render_scroll(term, new, dmg);
-            break;
-
-        case DAMAGE_SCROLL_REVERSE:
-            if (term->grid->view == term->grid->offset)
-                grid_render_scroll_reverse(term, new, dmg);
-            break;
-
-        case DAMAGE_SCROLL_IN_VIEW:
-            grid_render_scroll(term, new, dmg);
-            break;
-
-        case DAMAGE_SCROLL_REVERSE_IN_VIEW:
-            grid_render_scroll_reverse(term, new, dmg);
-            break;
-        }
-    }
+    /*
+     * TODO: re-apply last frame’s scroll damage
+     *
+     * We used to do this, but it turned out to be buggy. If we decide
+     * to re-add it, this is where to do it. Note that we’d also have
+     * to remove the updates to buf->dirty from grid_render_scroll()
+     * and grid_render_scroll_reverse().
+     */
 
     if (tll_length(term->grid->scroll_damage) == 0) {
+        /*
+         * We can only subtract current frame’s damage from the old
+         * frame’s if we don’t have any scroll damage.
+         *
+         * If we do have scroll damage, the damage region we
+         * calculated above is not (yet) valid - we need to apply the
+         * current frame’s scroll damage *first*. This is done later,
+         * when rendering the frame.
+         */
         pixman_region32_subtract(&dirty, &old->dirty, &dirty);
         pixman_image_set_clip_region32(new->pix[0], &dirty);
-    } else
+    } else {
+        /* Copy *all* of last frame’s damaged areas */
         pixman_image_set_clip_region32(new->pix[0], &old->dirty);
+    }
 
     pixman_image_composite32(
         PIXMAN_OP_SRC, old->pix[0], NULL, new->pix[0],
@@ -2674,38 +2726,29 @@ grid_render(struct terminal *term)
     shm_addref(buf);
     buf->age = 0;
 
-    free(term->render.last_buf->scroll_damage);
-    buf->scroll_damage_count = tll_length(term->grid->scroll_damage);
-    buf->scroll_damage = xmalloc(
-        buf->scroll_damage_count * sizeof(buf->scroll_damage[0]));
 
-    {
-        size_t i = 0;
-        tll_foreach(term->grid->scroll_damage, it) {
-            buf->scroll_damage[i++] = it->item;
-
-            switch (it->item.type) {
-            case DAMAGE_SCROLL:
-                if (term->grid->view == term->grid->offset)
-                    grid_render_scroll(term, buf, &it->item);
-                break;
-
-            case DAMAGE_SCROLL_REVERSE:
-                if (term->grid->view == term->grid->offset)
-                    grid_render_scroll_reverse(term, buf, &it->item);
-                break;
-
-            case DAMAGE_SCROLL_IN_VIEW:
+    tll_foreach(term->grid->scroll_damage, it) {
+        switch (it->item.type) {
+        case DAMAGE_SCROLL:
+            if (term->grid->view == term->grid->offset)
                 grid_render_scroll(term, buf, &it->item);
-                break;
+            break;
 
-            case DAMAGE_SCROLL_REVERSE_IN_VIEW:
+        case DAMAGE_SCROLL_REVERSE:
+            if (term->grid->view == term->grid->offset)
                 grid_render_scroll_reverse(term, buf, &it->item);
-                break;
-            }
+            break;
 
-            tll_remove(term->grid->scroll_damage, it);
+        case DAMAGE_SCROLL_IN_VIEW:
+            grid_render_scroll(term, buf, &it->item);
+            break;
+
+        case DAMAGE_SCROLL_REVERSE_IN_VIEW:
+            grid_render_scroll_reverse(term, buf, &it->item);
+            break;
         }
+
+        tll_remove(term->grid->scroll_damage, it);
     }
 
     /*
@@ -2885,15 +2928,21 @@ grid_render(struct terminal *term)
         struct timespec double_buffering_time;
         timespec_sub(&stop_double_buffering, &start_double_buffering, &double_buffering_time);
 
+        struct timespec total_render_time;
+        timespec_add(&render_time, &double_buffering_time, &total_render_time);
+
         switch (term->conf->tweak.render_timer) {
         case RENDER_TIMER_LOG:
         case RENDER_TIMER_BOTH:
-            LOG_INFO("frame rendered in %lds %ldns "
-                     "(%lds %ldns double buffering)",
-                     (long)render_time.tv_sec,
-                     render_time.tv_nsec,
-                     (long)double_buffering_time.tv_sec,
-                     double_buffering_time.tv_nsec);
+            LOG_INFO(
+                "frame rendered in %lds %9ldns "
+                "(%lds %9ldns rendering, %lds %9ldns double buffering)",
+                (long)total_render_time.tv_sec,
+                total_render_time.tv_nsec,
+                (long)render_time.tv_sec,
+                render_time.tv_nsec,
+                (long)double_buffering_time.tv_sec,
+                double_buffering_time.tv_nsec);
             break;
 
         case RENDER_TIMER_OSD:
@@ -2904,7 +2953,7 @@ grid_render(struct terminal *term)
         switch (term->conf->tweak.render_timer) {
         case RENDER_TIMER_OSD:
         case RENDER_TIMER_BOTH:
-            render_render_timer(term, render_time);
+            render_render_timer(term, total_render_time);
             break;
 
         case RENDER_TIMER_LOG:
@@ -3046,10 +3095,20 @@ render_search_box(struct terminal *term)
 #define WINDOW_X(x) (margin + x)
 #define WINDOW_Y(y) (term->height - margin - height + y)
 
-    /* Background - yellow on empty/match, red on mismatch */
-    pixman_color_t color = color_hex_to_pixman(
-        term->search.match_len == text_len
-        ? term->colors.table[3] : term->colors.table[1]);
+    const bool is_match = term->search.match_len == text_len;
+    const bool custom_colors = is_match
+        ? term->conf->colors.use_custom.search_box_match
+        : term->conf->colors.use_custom.search_box_no_match;
+
+    /* Background - yellow on empty/match, red on mismatch (default) */
+    const pixman_color_t color = color_hex_to_pixman(
+        is_match
+        ? (custom_colors
+           ? term->conf->colors.search_box.match.bg
+           : term->colors.table[3])
+        : (custom_colors
+           ? term->conf->colors.search_box.no_match.bg
+           : term->colors.table[1]));
 
     pixman_image_fill_rectangles(
         PIXMAN_OP_SRC, buf->pix[0], &color,
@@ -3065,7 +3124,12 @@ render_search_box(struct terminal *term)
     const int x_ofs = term->font_x_ofs;
     int x = x_left;
     int y = margin;
-    pixman_color_t fg = color_hex_to_pixman(term->colors.table[0]);
+    pixman_color_t fg = color_hex_to_pixman(
+        custom_colors
+        ? (is_match
+           ? term->conf->colors.search_box.match.fg
+           : term->conf->colors.search_box.no_match.fg)
+        : term->colors.table[0]);
 
     /* Move offset we start rendering at, to ensure the cursor is visible */
     for (size_t i = 0, cell_idx = 0; i <= term->search.cursor; cell_idx += widths[i], i++) {

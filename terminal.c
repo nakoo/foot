@@ -203,6 +203,30 @@ fdm_ptmx_out(struct fdm *fdm, int fd, int events, void *data)
     return true;
 }
 
+static bool
+add_utmp_record(const struct config *conf, struct reaper *reaper, int ptmx)
+{
+    if (ptmx < 0)
+        return true;
+    if (conf->utempter_path == NULL)
+        return true;
+
+    char *const argv[] = {conf->utempter_path, "add", getenv("WAYLAND_DISPLAY"), NULL};
+    return spawn(reaper, NULL, argv, ptmx, ptmx, -1, NULL);
+}
+
+static bool
+del_utmp_record(const struct config *conf, struct reaper *reaper, int ptmx)
+{
+    if (ptmx < 0)
+        return true;
+    if (conf->utempter_path == NULL)
+        return true;
+
+    char *const argv[] = {conf->utempter_path, "del", getenv("WAYLAND_DISPLAY"), NULL};
+    return spawn(reaper, NULL, argv, ptmx, ptmx, -1, NULL);
+}
+
 #if PTMX_TIMING
 static struct timespec last = {0};
 #endif
@@ -326,6 +350,7 @@ fdm_ptmx(struct fdm *fdm, int fd, int events, void *data)
     }
 
     if (hup) {
+        del_utmp_record(term->conf, term->reaper, term->ptmx);
         fdm_del(fdm, fd);
         term->ptmx = -1;
     }
@@ -1089,6 +1114,11 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         goto close_fds;
     }
 
+    /* Need to register *very* early (before the first “goto err”), to
+     * ensure term_destroy() doesn’t unref a key-binding we haven’t
+     * yet ref:d */
+    key_binding_new_for_conf(wayl->key_binding_manager, wayl, conf);
+
     int ptmx_flags;
     if ((ptmx_flags = fcntl(ptmx, F_GETFL)) < 0 ||
         fcntl(ptmx, F_SETFL, ptmx_flags | O_NONBLOCK) < 0)
@@ -1246,6 +1276,8 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
     }
     term->font_line_height = conf->line_height;
 
+    add_utmp_record(conf, reaper, ptmx);
+
     /* Start the slave/client */
     if ((term->slave = slave_spawn(
              term->ptmx, argc, term->cwd, argv, envp, &conf->env_vars,
@@ -1265,8 +1297,6 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
     }
 
     memcpy(term->colors.table, term->conf->colors.table, sizeof(term->colors.table));
-
-    key_binding_new_for_term(wayl->key_binding_manager, term);
 
     /* Initialize the Wayland window backend */
     if ((term->window = wayl_win_init(term, token)) == NULL)
@@ -1511,6 +1541,8 @@ term_shutdown(struct terminal *term)
     fdm_del(term->fdm, term->blink.fd);
     fdm_del(term->fdm, term->flash.fd);
 
+    del_utmp_record(term->conf, term->reaper, term->ptmx);
+
     if (term->window != NULL && term->window->is_configured)
         fdm_del(term->fdm, term->ptmx);
     else
@@ -1583,7 +1615,7 @@ term_destroy(struct terminal *term)
     if (term == NULL)
         return 0;
 
-    key_binding_unref_term(term->wl->key_binding_manager, term);
+    key_binding_unref(term->wl->key_binding_manager, term->conf);
 
     tll_foreach(term->wl->terms, it) {
         if (it->item == term) {
@@ -1591,6 +1623,8 @@ term_destroy(struct terminal *term)
             break;
         }
     }
+
+    del_utmp_record(term->conf, term->reaper, term->ptmx);
 
     fdm_del(term->fdm, term->selection.auto_scroll.fd);
     fdm_del(term->fdm, term->render.app_sync_updates.timer_fd);
@@ -1811,7 +1845,7 @@ static inline void
 erase_line(struct terminal *term, struct row *row)
 {
     erase_cell_range(term, row, 0, term->cols - 1);
-    row->linebreak = true;
+    row->linebreak = false;
     row->prompt_marker = false;
 }
 
@@ -2537,11 +2571,11 @@ term_scroll_partial(struct terminal *term, struct scroll_region region, int rows
          * scrolled in (i.e. re-used lines).
          */
         if (selection_on_top_region(term, region) ||
-            selection_on_bottom_region(term, region) ||
-            selection_on_rows(term, region.end - rows, region.end - 1))
+            selection_on_bottom_region(term, region))
         {
             selection_cancel(term);
-        }
+        } else
+            selection_scroll_up(term, rows);
     }
 
     sixel_scroll_up(term, rows);
@@ -2611,11 +2645,11 @@ term_scroll_reverse_partial(struct terminal *term,
          * scrolled in (i.e. re-used lines).
          */
         if (selection_on_top_region(term, region) ||
-            selection_on_bottom_region(term, region) ||
-            selection_on_rows(term, region.start, region.start + rows - 1))
+            selection_on_bottom_region(term, region))
         {
             selection_cancel(term);
-        }
+        } else
+            selection_scroll_down(term, rows);
     }
 
     sixel_scroll_down(term, rows);
@@ -2885,7 +2919,7 @@ term_mouse_grabbed(const struct terminal *term, const struct seat *seat)
     get_current_modifiers(seat, &mods, NULL, 0);
 
     const struct key_binding_set *bindings =
-        key_binding_for(term->wl->key_binding_manager, term, seat);
+        key_binding_for(term->wl->key_binding_manager, term->conf, seat);
     const xkb_mod_mask_t override_modmask = bindings->selection_overrides;
     bool override_mods_pressed = (mods & override_modmask) == override_modmask;
 
@@ -3298,6 +3332,7 @@ term_print(struct terminal *term, char32_t wc, int width)
     /* *Must* get current cell *after* linewrap+insert */
     struct row *row = grid->cur_row;
     row->dirty = true;
+    row->linebreak = true;
 
     struct cell *cell = &row->cells[col];
     cell->wc = term->vt.last_printed = wc;
@@ -3357,6 +3392,7 @@ ascii_printer_fast(struct terminal *term, char32_t wc)
 
     struct row *row = grid->cur_row;
     row->dirty = true;
+    row->linebreak = true;
 
     struct cell *cell = &row->cells[col];
     cell->wc = term->vt.last_printed = wc;

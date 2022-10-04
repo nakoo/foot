@@ -1,6 +1,8 @@
 # Changelog
 
 * [Unreleased](#unreleased)
+* [1.13.1](#1-13-1)
+* [1.13.0](#1-13-0)
 * [1.12.1](#1-12-1)
 * [1.12.0](#1-12-0)
 * [1.11.0](#1-11-0)
@@ -43,6 +45,80 @@
 
 ### Added
 
+* Support for adjusting the thickness of regular underlines ([#1136][1136]).
+* Support (optional) for utmp logging with libutempter.
+* `kxIN` and `kxOUT` (focus in/out events) to terminfo.
+* `name` capability to `XTGETTCAP`.
+
+[1136]: https://codeberg.org/dnkl/foot/issues/1136
+
+
+### Changed
+
+* Default color theme from a variant of the Zenburn theme, to a
+  variant of the Solarized dark theme.
+* Default `pad` from 2x2 to 0x0 (i.e. no padding at all).
+* Current working directory (as set by OSC-7) is now passed to the
+  program executed by the `pipe-*` key bindings ([#1166][1166]).
+* `DECRPM` replies (to `DECRQM` queries) now report a value of `4`
+  ("permanently reset") instead of `2` ("reset") for DEC private
+  modes that are known but unsupported.
+* Set `PWD` environment variable in the slave process ([#1179][1179]).
+
+[1166]: https://codeberg.org/dnkl/foot/issues/1166
+[1179]: https://codeberg.org/dnkl/foot/issues/1179
+
+
+### Deprecated
+### Removed
+### Fixed
+
+* Crash in `foot --server` on key press, after another `footclient`
+  has terminated very early (for example, by trying to launch a
+  non-existing shell/client).
+* Glitchy rendering when scrolling in the scrollback, on compositors
+  that does not allow Wayland buffer re-use (e.g. KDE/plasma)
+  ([#1173][1173])
+* Scrollback search matches not being highlighted correctly, on
+  compositors that does now allow Wayland buffer re-use
+  (e.g. KDE/plasma).
+
+[1173]: https://codeberg.org/dnkl/foot/issues/1173
+
+
+### Security
+### Contributors
+
+* Craig Barnes
+
+
+## 1.13.1
+
+### Changed
+
+* Window is now dimmed while in Unicode input mode.
+
+
+### Fixed
+
+* Compiling against wayland-protocols < 1.25
+* Crash on buggy compositors (GNOME) that sometimes send pointer-enter
+  events with a NULL surface. Foot now ignores these events, and the
+  subsequent motion and leave events.
+* Regression: “random” selected empty cells being highlighted as
+  selected when they should not.
+* Crash when either resizing the terminal window, or scrolling in the
+  scrollback history ([#1074][1074])
+* OSC-8 URLs with matching IDs, but mismatching URIs being incorrectly
+  connected.
+
+[1074]: https://codeberg.org/dnkl/foot/pulls/1074
+
+
+## 1.13.0
+
+### Added
+
 * XDG activation support when opening URLs ([#1058][1058]).
 * `-Dsystemd-units-dir=<path>` meson command line option.
 * Support for custom environment variables in `foot.ini`
@@ -50,10 +126,21 @@
 * Support for jumping to previous/next prompt (requires shell
   integration). By default bound to `ctrl`+`shift`+`z` and
   `ctrl`+`shift`+`x` respectively ([#30][30]).
+* `colors.search-box-no-match` and `colors.search-box-match` options
+  to `foot.ini` ([#1112][1112]).
+* Very basic Unicode input mode via the new
+  `key-bindings.unicode-input` and `search-bindings.unicode-input` key
+  bindings. Note that there is no visual feedback, as the preferred
+  way of entering Unicode characters is with an IME ([#1116][1116]).
+* Support for `xdg_toplevel.wm_capabilities`, to adapt the client-side
+  decoration buttons to the compositor capabilities ([#1061][1061]).
 
 [1058]: https://codeberg.org/dnkl/foot/issues/1058
 [1070]: https://codeberg.org/dnkl/foot/issues/1070
 [30]: https://codeberg.org/dnkl/foot/issues/30
+[1112]: https://codeberg.org/dnkl/foot/issues/1112
+[1116]: https://codeberg.org/dnkl/foot/issues/1116
+[1061]: https://codeberg.org/dnkl/foot/pulls/1061
 
 
 ### Changed
@@ -64,12 +151,13 @@
   mode ([#1084][1084]).
 * NUL is now stripped when pasting in non-bracketed mode
   ([#1084][1084]).
+* `alt`+`escape` now emits `\E\E` instead of a `CSI 27` sequence
+  ([#1105][1105]).
 
 [1084]: https://codeberg.org/dnkl/foot/issues/1084
+[1105]: https://codeberg.org/dnkl/foot/issues/1105
 
 
-### Deprecated
-### Removed
 ### Fixed
 
 * Graphical corruption when viewport is at the top of the scrollback,
@@ -80,13 +168,40 @@
 * Workaround for buggy compositors (e.g. some versions of GNOME)
   allowing drag-and-drops even though foot has reported it does not
   support the offered mime-types ([#1092][1092]).
+* Keyboard enter/leave events being ignored if there is no keymap
+  ([#1097][1097]).
+* Crash when application emitted an invalid `CSI 38;5;<idx>m`, `CSI
+  38:5:<idx>m`, `CSI 48;5;<idx>m` or `CSI 48:5:<idx>m` sequence
+  ([#1111][1111]).
+* Certain dead-key combinations resulting in different escape
+  sequences compared to kitty, when the kitty keyboard protocol is
+  used ([#1120][1120]).
+* Search matches ending with a double-width character not being
+  highlighted correctly.
+* Selection not being cancelled correctly when scrolled out.
+* Extending a multi-page selection behaving inconsistently.
+* Poor performance when making very large selections ([#1114][1114]).
+* Bogus error message when using systemd socket activation for server
+  mode ([#1107][1107])
+* Empty line at the bottom after a window resize ([#1108][1108]).
 
 [1055]: https://codeberg.org/dnkl/foot/issues/1055
 [1092]: https://codeberg.org/dnkl/foot/issues/1092
+[1097]: https://codeberg.org/dnkl/foot/issues/1097
+[1111]: https://codeberg.org/dnkl/foot/issues/1111
+[1120]: https://codeberg.org/dnkl/foot/issues/1120
+[1114]: https://codeberg.org/dnkl/foot/issues/1114
+[1107]: https://codeberg.org/dnkl/foot/issues/1107
+[1108]: https://codeberg.org/dnkl/foot/issues/1108
 
 
-### Security
 ### Contributors
+
+* Craig Barnes
+* Lorenz
+* Max Gautier
+* Simon Ser
+* Stefan Prosiegel
 
 
 ## 1.12.1

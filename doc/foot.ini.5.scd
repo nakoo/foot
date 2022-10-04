@@ -132,6 +132,18 @@ commented out will usually be installed to */etc/xdg/foot/foot.ini*.
 	
 	Default: _unset_.
 
+*underline-thickness*
+	Use a custom thickness (height) for underlines. The thickness is, by
+	default, in _points_.
+
+	To specify a thickness in _pixels_, append *px*:
+	*underline-thickness=1px*.
+
+	If left unset (the default), the thickness specified in the font is
+	used.
+
+	Default: _unset_
+
 *box-drawings-uses-font-glyphs* Boolean. When disabled, foot generates
 	box/line drawing characters itself. The are several advantages to
 	doing this instead of using font glyphs:
@@ -198,7 +210,7 @@ commented out will usually be installed to */etc/xdg/foot/foot.ini*.
 	To instead center the grid content, append *center* (e.g. *pad=5x5
 	center*).
 	
-	Default: _2x2_.
+	Default: _0x0_.
 
 *resize-delay-ms*
 	Time, in milliseconds, of "idle time" before foot sends the new
@@ -304,6 +316,10 @@ commented out will usually be installed to */etc/xdg/foot/foot.ini*.
 	multithreading. Default: the number of available logical CPUs
 	(including SMT). Note that this is not always the best value. In
 	some cases, the number of physical _cores_ is better.
+
+*utempter*
+	Path to utempter helper binary. Set to *none* to disable utmp
+	records. Default: _@utempter@_.
 
 # SECTION: environment
 
@@ -495,21 +511,23 @@ can configure the background transparency with the _alpha_ option.
 
 *foreground*
 	Default foreground color. This is the color used when no ANSI
-	color is being used. Default: _dcdccc_.
+	color is being used. Default: _839496_.
 
 *background*
 	Default background color. This is the color used when no ANSI
-	color is being used. Default: _111111_.
+	color is being used. Default: _002b36_.
 
 *regular0*, *regular1* *..* *regular7*
 	The eight basic ANSI colors (Black, Red, Green, Yellow, Blue,
-	Magenta, Cyan, White). Default: _222222_, _cc9393_, _7f9f7f_, _d0bf8f_,
-	_6ca0a3_, _dc8cc3_, _93e0e3_ and _dcdccc_ (a variant of the _zenburn_ theme).
+	Magenta, Cyan, White). Default: _073642_, _dc322f_, _859900_,
+	_b58900_, _268bd2_, _d33682_, _2aa198_ and _eee8d5_ (a variant of
+	the _solarized dark_ theme).
 
 *bright0*, *bright1* *..* *bright7*
 	The eight bright ANSI colors (Black, Red, Green, Yellow, Blue,
-	Magenta, Cyan, White). Default: _666666_, _dca3a3_, _bfebbf_, _f0dfaf_,
-	_8cd0d3_, _fcace3_, _b3ffff_ and _ffffff_ (a variant of the _zenburn_ theme).
+	Magenta, Cyan, White). Default: _08404f_, _e35f5c_, _9fb700_,
+	_d9a400_, _4ba1de_, _dc619d_, _32c1b6_ and _ffffff_ (a variant of
+	the _solarized dark_ theme).
 
 *dim0*, *dim1* *..* *dim7*
 	Custom colors to use with dimmed colors. Dimmed colors do not have
@@ -565,6 +583,16 @@ can configure the background transparency with the _alpha_ option.
 	Two color values specifying the foreground (text) and background
 	(indicator itself) colors for the scrollback indicator. Default:
 	_regular0 bright4_.
+
+*search-box-no-match*
+	Two color values specifying the foreground (text) and background
+	colors for the scrollback search box, when there are no
+	matches. Default: _regular0 regular1_.
+
+*search-box-match*
+	Two color values specifying the foreground (text) and background
+	colors for the scrollback search box, when the search box is
+	either empty, or there are matches. Default: _regular0 regular3_.
 
 *urls*
 	Color to use for the underline used to highlight URLs in URL
@@ -781,6 +809,32 @@ e.g. *search-start=none*.
 	Jump the next prompt (requires shell integration, see
 	*foot*(1)). Default: _Control+Shift+x_.
 
+*unicode-input*
+	Input a Unicode character by typing its codepoint in hexadecimal,
+	followed by *Enter* or *Space*.
+	
+	For example, to input the character _ö_ (LATIN SMALL LETTER O WITH
+	DIAERESIS, Unicode codepoint 0xf6), you would first activate this
+	key binding, then type: *f*, *6*, *Enter*.
+	
+	Another example: to input 😍 (SMILING FACE WITH HEART-SHAPED EYES,
+	Unicode codepoint 0x1f60d), activate this key binding, then type:
+	*1*, *f*, *6*, *0*, *d*, *Enter*.
+	
+	Recognized key bindings in Unicode input mode:
+	
+	- Enter, Space: commit the Unicode character, then exit this mode.
+	- Escape, q, Ctrl+c, Ctrl+d, Ctrl+g: abort input, then exit this mode.
+	- 0-9, a-f: append next digit to the Unicode's codepoint.
+	- Backspace: undo the last digit.
+	
+	Note that there is no visual feedback while in this mode. This is
+	by design; foot's Unicode input mode is considered to be a
+	fallback. The preferred way of entering Unicode characters, emojis
+	etc is by using an IME.
+	
+	Default: _none_.
+
 # SECTION: search-bindings
 
 This section lets you override the default key bindings used in
@@ -862,6 +916,10 @@ scrollback search mode. The syntax is exactly the same as the regular
 *primary-paste*
 	Paste from the _primary selection_ into the search
 	buffer. Default: _Shift+Insert_.
+
+*unicode-input*
+	Unicode input mode. See _key-bindings.unicode-input_ for
+	details. Default: _none_.
 
 # SECTION: url-bindings
 

@@ -150,6 +150,7 @@ struct config {
 
     bool use_custom_underline_offset;
     struct pt_or_px underline_offset;
+    struct pt_or_px underline_thickness;
 
     bool box_drawings_uses_font_glyphs;
     bool can_shape_grapheme;
@@ -218,10 +219,24 @@ struct config {
         } scrollback_indicator;
 
         struct {
+            struct {
+                uint32_t fg;
+                uint32_t bg;
+            } no_match;
+
+            struct {
+                uint32_t fg;
+                uint32_t bg;
+            } match;
+        } search_box;
+
+        struct {
             bool selection:1;
             bool jump_label:1;
             bool scrollback_indicator:1;
             bool url:1;
+            bool search_box_no_match:1;
+            bool search_box_match:1;
             uint8_t dim;
         } use_custom;
     } colors;
@@ -303,6 +318,8 @@ struct config {
     bool notify_focus_inhibit;
 
     env_var_list_t env_vars;
+
+    char *utempter_path;
 
     struct {
         enum fcft_scaling_filter fcft_filter;

@@ -402,6 +402,52 @@ test_color(struct context *ctx, bool (*parse_fun)(struct context *ctx),
 }
 
 static void
+test_two_colors(struct context *ctx, bool (*parse_fun)(struct context *ctx),
+                const char *key, bool alpha_allowed,
+                uint32_t *ptr1, uint32_t *ptr2)
+{
+    ctx->key = key;
+
+    const struct {
+        const char *option_string;
+        uint32_t color1;
+        uint32_t color2;
+        bool invalid;
+    } input[] = {
+        {"000000 000000", 0, 0},
+
+        /* No alpha */
+        {"999999 888888", 0x999999, 0x888888},
+        {"ffffff aaaaaa", 0xffffff, 0xaaaaaa},
+
+        /* Both colors have alpha component */
+        {"ffffffff 00000000", 0xffffffff, 0x00000000, !alpha_allowed},
+        {"aabbccdd, ee112233", 0xaabbccdd, 0xee112233, !alpha_allowed},
+
+        /* Only one color has alpha component */
+        {"ffffffff 112233", 0xffffffff, 0x112233, !alpha_allowed},
+        {"ffffff ff112233", 0x00ffffff, 0xff112233, !alpha_allowed},
+
+        {"unittest-invalid-color", 0, 0, true},
+    };
+
+    for (size_t i = 0; i < ALEN(input); i++) {
+        ctx->value = input[i].option_string;
+        if (input[i].invalid) {
+            if (parse_fun(ctx)) {
+                BUG("[%s].%s=%s: did not fail to parse as expected",
+                    ctx->section, ctx->key, ctx->value);
+            }
+        } else {
+            if (!parse_fun(ctx)) {
+                BUG("[%s].%s=%s: failed to parse",
+                    ctx->section, ctx->key, ctx->value);
+            }
+        }
+    }
+}
+
+static void
 test_section_main(void)
 {
     struct config conf = {0};
@@ -412,6 +458,7 @@ test_section_main(void)
     test_string(&ctx, &parse_section_main, "shell", &conf.shell);
     test_string(&ctx, &parse_section_main, "term", &conf.term);
     test_string(&ctx, &parse_section_main, "app-id", &conf.app_id);
+    test_string(&ctx, &parse_section_main, "utempter", &conf.utempter_path);
 
     test_c32string(&ctx, &parse_section_main, "word-delimiters", &conf.word_delimiters);
 
@@ -424,6 +471,7 @@ test_section_main(void)
     test_pt_or_px(&ctx, &parse_section_main, "letter-spacing", &conf.letter_spacing);
     test_pt_or_px(&ctx, &parse_section_main, "horizontal-letter-offset", &conf.horizontal_letter_offset);
     test_pt_or_px(&ctx, &parse_section_main, "vertical-letter-offset", &conf.vertical_letter_offset);
+    test_pt_or_px(&ctx, &parse_section_main, "underline-thickness", &conf.underline_thickness);
 
     test_uint16(&ctx, &parse_section_main, "resize-delay-ms", &conf.resize_delay_ms);
     test_uint16(&ctx, &parse_section_main, "workers", &conf.render_worker_count);
@@ -616,6 +664,18 @@ test_section_colors(void)
     test_color(&ctx, &parse_section_colors, "selection-foreground", false, &conf.colors.selection_fg);
     test_color(&ctx, &parse_section_colors, "selection-background", false, &conf.colors.selection_bg);
     test_color(&ctx, &parse_section_colors, "urls", false, &conf.colors.url);
+    test_two_colors(&ctx, &parse_section_colors, "jump-labels", false,
+                    &conf.colors.jump_label.fg,
+                    &conf.colors.jump_label.bg);
+    test_two_colors(&ctx, &parse_section_colors, "scrollback-indicator", false,
+                    &conf.colors.scrollback_indicator.fg,
+                    &conf.colors.scrollback_indicator.bg);
+    test_two_colors(&ctx, &parse_section_colors, "search-box-no-match", false,
+                    &conf.colors.search_box.no_match.fg,
+                    &conf.colors.search_box.no_match.bg);
+    test_two_colors(&ctx, &parse_section_colors, "search-box-match", false,
+                    &conf.colors.search_box.match.fg,
+                    &conf.colors.search_box.match.bg);
 
     for (size_t i = 0; i < 255; i++) {
         char key_name[4];
@@ -627,8 +687,6 @@ test_section_colors(void)
     test_invalid_key(&ctx, &parse_section_colors, "256");
 
     /* TODO: alpha (float in range 0-1, converted to uint16_t) */
-    /* TODO: jump-labels (two colors) */
-    /* TODO: scrollback-indicator (two colors) */
 
     config_free(&conf);
 }

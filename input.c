@@ -36,6 +36,7 @@
 #include "spawn.h"
 #include "terminal.h"
 #include "tokenize.h"
+#include "unicode-mode.h"
 #include "url-mode.h"
 #include "util.h"
 #include "vt.h"
@@ -282,7 +283,7 @@ execute_binding(struct seat *seat, struct terminal *term,
             }
         }
 
-        if (!spawn(term->reaper, NULL, binding->aux->pipe.args,
+        if (!spawn(term->reaper, term->cwd, binding->aux->pipe.args,
                    pipe_fd[0], stdout_fd, stderr_fd, NULL))
             goto pipe_err;
 
@@ -415,6 +416,10 @@ execute_binding(struct seat *seat, struct terminal *term,
 
         return true;
     }
+
+    case BIND_ACTION_UNICODE_INPUT:
+        unicode_mode_activate(seat);
+        return true;
 
     case BIND_ACTION_SELECT_BEGIN:
         selection_start(
@@ -591,9 +596,6 @@ keyboard_enter(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
     LOG_DBG("%s: keyboard_enter: keyboard=%p, serial=%u, surface=%p",
             seat->name, (void *)wl_keyboard, serial, (void *)surface);
 
-    if (seat->kbd.xkb == NULL)
-        return;
-
     term_kbd_focus_in(term);
     seat->kbd_focus = term;
     seat->kbd.serial = serial;
@@ -652,9 +654,6 @@ keyboard_leave(void *data, struct wl_keyboard *wl_keyboard, uint32_t serial,
 
     LOG_DBG("keyboard_leave: keyboard=%p, serial=%u, surface=%p",
             (void *)wl_keyboard, serial, (void *)surface);
-
-    if (seat->kbd.xkb == NULL)
-        return;
 
     xassert(
         seat->kbd_focus == NULL ||
@@ -1245,7 +1244,7 @@ emit_escapes:
             ? ctx->level0_syms.syms[0]
             : sym;
 
-        if (composed && is_text)
+        if (composed)
             key = utf32;
         else {
             key = xkb_keysym_to_utf32(sym_to_use);
@@ -1407,11 +1406,16 @@ key_press_release(struct seat *seat, struct terminal *term, uint32_t serial,
         seat->kbd.xkb_keymap, key, layout_idx, 0, &raw_syms);
 
     const struct key_binding_set *bindings = key_binding_for(
-        seat->wayl->key_binding_manager, term, seat);
+        seat->wayl->key_binding_manager, term->conf, seat);
     xassert(bindings != NULL);
 
     if (pressed) {
-        if (term->is_searching) {
+        if (seat->unicode_mode.active) {
+            unicode_mode_input(seat, term, sym);
+            return;
+        }
+
+        else if (term->is_searching) {
             if (should_repeat)
                 start_repeater(seat, key);
 
@@ -1705,11 +1709,9 @@ wl_pointer_enter(void *data, struct wl_pointer *wl_pointer,
                  uint32_t serial, struct wl_surface *surface,
                  wl_fixed_t surface_x, wl_fixed_t surface_y)
 {
-    xassert(surface != NULL);
-    xassert(serial != 0);
-
-    if (surface == NULL)  {
+    if (unlikely(surface == NULL))  {
         /* Seen on mutter-3.38 */
+        LOG_WARN("compositor sent pointer_enter event with a NULL surface");
         return;
     }
 
@@ -1862,6 +1864,16 @@ wl_pointer_motion(void *data, struct wl_pointer *wl_pointer,
     struct seat *seat = data;
     struct wayland *wayl = seat->wayl;
     struct terminal *term = seat->mouse_focus;
+
+    if (unlikely(term == NULL)) {
+        /* Typically happens when the compositor sent a pointer enter
+         * event with a NULL surface - see wl_pointer_enter().
+         *
+         * In this case, we never set seat->mouse_focus (since we
+         * can’t map the enter event to a specific window). */
+        return;
+    }
+
     struct wl_window *win = term->window;
 
     LOG_DBG("pointer_motion: pointer=%p, x=%d, y=%d", (void *)wl_pointer,
@@ -2323,7 +2335,7 @@ wl_pointer_button(void *data, struct wl_pointer *wl_pointer,
                     /* Seat has keyboard - use mouse bindings *with* modifiers */
 
                     const struct key_binding_set *bindings = key_binding_for(
-                        wayl->key_binding_manager, term, seat);
+                        wayl->key_binding_manager, term->conf, seat);
                     xassert(bindings != NULL);
 
                     xkb_mod_mask_t mods;

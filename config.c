@@ -30,8 +30,8 @@
 #include "xmalloc.h"
 #include "xsnprintf.h"
 
-static const uint32_t default_foreground = 0xdcdccc;
-static const uint32_t default_background = 0x111111;
+static const uint32_t default_foreground = 0x839496;
+static const uint32_t default_background = 0x002b36;
 
 static const size_t min_csd_border_width = 5;
 
@@ -48,23 +48,23 @@ static const size_t min_csd_border_width = 5;
 
 static const uint32_t default_color_table[256] = {
     // Regular
-    0x222222,
-    0xcc9393,
-    0x7f9f7f,
-    0xd0bf8f,
-    0x6ca0a3,
-    0xdc8cc3,
-    0x93e0e3,
-    0xdcdccc,
+    0x073642,
+    0xdc322f,
+    0x859900,
+    0xb58900,
+    0x268bd2,
+    0xd33682,
+    0x2aa198,
+    0xeee8d5,
 
     // Bright
-    0x666666,
-    0xdca3a3,
-    0xbfebbf,
-    0xf0dfaf,
-    0x8cd0d3,
-    0xfcace3,
-    0xb3ffff,
+    0x08404f,
+    0xe35f5c,
+    0x9fb700,
+    0xd9a400,
+    0x4ba1de,
+    0xdc619d,
+    0x32c1b6,
     0xffffff,
 
     // 6x6x6 RGB cube
@@ -117,6 +117,7 @@ static const char *const binding_action_map[] = {
     [BIND_ACTION_TEXT_BINDING] = "text-binding",
     [BIND_ACTION_PROMPT_PREV] = "prompt-prev",
     [BIND_ACTION_PROMPT_NEXT] = "prompt-next",
+    [BIND_ACTION_UNICODE_INPUT] = "unicode-input",
 
     /* Mouse-specific actions */
     [BIND_ACTION_SELECT_BEGIN] = "select-begin",
@@ -149,6 +150,7 @@ static const char *const search_binding_action_map[] = {
     [BIND_ACTION_SEARCH_EXTEND_LINE] = "extend-to-end-line",
     [BIND_ACTION_SEARCH_CLIPBOARD_PASTE] = "clipboard-paste",
     [BIND_ACTION_SEARCH_PRIMARY_PASTE] = "primary-paste",
+    [BIND_ACTION_SEARCH_UNICODE_INPUT] = "unicode-input",
 };
 
 static const char *const url_binding_action_map[] = {
@@ -903,6 +905,9 @@ parse_section_main(struct context *ctx)
         return true;
     }
 
+    else if (strcmp(key, "underline-thickness") == 0)
+        return value_to_pt_or_px(ctx, &conf->underline_thickness);
+
     else if (strcmp(key, "dpi-aware") == 0) {
         if (strcmp(value, "auto") == 0)
             conf->dpi_aware = DPI_AWARE_AUTO;
@@ -939,6 +944,18 @@ parse_section_main(struct context *ctx)
 
     else if (strcmp(key, "box-drawings-uses-font-glyphs") == 0)
         return value_to_bool(ctx, &conf->box_drawings_uses_font_glyphs);
+
+    else if (strcmp(key, "utempter") == 0) {
+        if (!value_to_str(ctx, &conf->utempter_path))
+            return false;
+
+        if (strcmp(conf->utempter_path, "none") == 0) {
+            free(conf->utempter_path);
+            conf->utempter_path = NULL;
+        }
+
+        return true;
+    }
 
     else {
         LOG_CONTEXTUAL_ERR("not a valid option: %s", key);
@@ -1169,6 +1186,34 @@ parse_section_colors(struct context *ctx)
         }
 
         conf->colors.use_custom.scrollback_indicator = true;
+        return true;
+    }
+
+    else if (strcmp(key, "search-box-no-match") == 0) {
+        if (!value_to_two_colors(
+                ctx,
+                &conf->colors.search_box.no_match.fg,
+                &conf->colors.search_box.no_match.bg,
+                false))
+        {
+            return false;
+        }
+
+        conf->colors.use_custom.search_box_no_match = true;
+        return true;
+    }
+
+    else if (strcmp(key, "search-box-match") == 0) {
+        if (!value_to_two_colors(
+                ctx,
+                &conf->colors.search_box.match.fg,
+                &conf->colors.search_box.match.bg,
+                false))
+        {
+            return false;
+        }
+
+        conf->colors.use_custom.search_box_match = true;
         return true;
     }
 
@@ -1976,6 +2021,9 @@ resolve_key_binding_collisions(struct config *conf, const char *section_name,
                 sym_equal = (binding1->m.button == binding2->m.button &&
                              binding1->m.count == binding2->m.count);
                 break;
+
+            default:
+                BUG("unhandled key binding type");
             }
 
             if (!mods_equal || !sym_equal)
@@ -2610,6 +2658,9 @@ parse_config_file(FILE *f, struct config *conf, const char *path, bool errors_ar
 
         if (!section_parser(ctx))
             error_or_continue();
+
+        /* For next iteration of getline() */
+        errno = 0;
     }
 
     if (errno != 0) {
@@ -2787,8 +2838,8 @@ config_load(struct config *conf, const char *conf_path,
             .width = 700,
             .height = 500,
         },
-        .pad_x = 2,
-        .pad_y = 2,
+        .pad_x = 0,
+        .pad_y = 0,
         .resize_delay_ms = 100,
         .bold_in_bright = {
             .enabled = false,
@@ -2802,6 +2853,7 @@ config_load(struct config *conf, const char *conf_path,
         .vertical_letter_offset = {.pt = 0, .px = 0},
         .use_custom_underline_offset = false,
         .box_drawings_uses_font_glyphs = false,
+        .underline_thickness = {.pt = 0., .px = -1},
         .dpi_aware = DPI_AWARE_AUTO, /* DPI-aware when scaling-factor == 1 */
         .bell = {
             .urgent = false,
@@ -2899,6 +2951,9 @@ config_load(struct config *conf, const char *conf_path,
         },
 
         .env_vars = tll_init(),
+        .utempter_path = (strlen(FOOT_DEFAULT_UTEMPTER_PATH) > 0
+                          ? xstrdup(FOOT_DEFAULT_UTEMPTER_PATH)
+                          : NULL),
         .notifications = tll_init(),
     };
 
@@ -3187,6 +3242,9 @@ config_clone(const struct config *old)
         tll_push_back(conf->env_vars, copy);
     }
 
+    conf->utempter_path =
+        old->utempter_path != NULL ? xstrdup(old->utempter_path) : NULL;
+
     conf->notifications.length = 0;
     conf->notifications.head = conf->notifications.tail = 0;
     tll_foreach(old->notifications, it) {
@@ -3253,6 +3311,7 @@ config_free(struct config *conf)
         tll_remove(conf->env_vars, it);
     }
 
+    free(conf->utempter_path);
     user_notifications_free(&conf->notifications);
 }
 
