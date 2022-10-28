@@ -8,6 +8,3 @@ NonBlocking=true
 Requires=%N.socket
 Description=Foot terminal server mode for WAYLAND_DISPLAY=%i
 Documentation=man:foot(1)
-
-[Install]
-WantedBy=wayland-instance@.target

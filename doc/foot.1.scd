@@ -123,7 +123,11 @@ the foot command line
 
 	Two systemd units (foot-server@.{service,socket}) are provided to use that
 	feature with systemd. They need to be instantiated with the value of
-	$WAYLAND_DISPLAY (multiples instances can co-exists).
+	$WAYLAND_DISPLAY (multiples instances can co-exists). The recommended
+	way of enabling the systemd-managed server is by running
+	*systemctl --user enable --now foot-server@$WAYLAND\_DISPLAY.socket*;
+	this way the service will only be started when needed thanks to socket
+	activation.
 
 	Note that starting *foot --server* as a systemd service will use
 	the environment of the systemd user instance; thus, if you need specific
