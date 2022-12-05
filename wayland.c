@@ -1839,7 +1839,7 @@ wayl_win_csd_borders_visible(const struct wl_window *win)
 bool
 wayl_win_subsurface_new_with_custom_parent(
     struct wl_window *win, struct wl_surface *parent,
-    struct wl_surf_subsurf *surf, bool allow_pointer_input)
+    struct wl_surf *surf, bool allow_pointer_input)
 {
     struct wayland *wayl = win->term->wl;
 
@@ -1877,7 +1877,7 @@ wayl_win_subsurface_new_with_custom_parent(
 }
 
 bool
-wayl_win_subsurface_new(struct wl_window *win, struct wl_surf_subsurf *surf,
+wayl_win_subsurface_new(struct wl_window *win, struct wl_surf *surf,
                         bool allow_pointer_input)
 {
     return wayl_win_subsurface_new_with_custom_parent(
@@ -1885,7 +1885,7 @@ wayl_win_subsurface_new(struct wl_window *win, struct wl_surf_subsurf *surf,
 }
 
 void
-wayl_win_subsurface_destroy(struct wl_surf_subsurf *surf)
+wayl_win_subsurface_destroy(struct wl_surf *surf)
 {
     if (surf == NULL)
         return;

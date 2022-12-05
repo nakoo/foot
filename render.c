@@ -1489,7 +1489,7 @@ render_ime_preedit(struct terminal *term, struct buffer *buf)
 static void
 render_overlay(struct terminal *term)
 {
-    struct wl_surf_subsurf *overlay = &term->window->overlay;
+    struct wl_surf *overlay = &term->window->overlay;
     bool unicode_mode_active = false;
 
     /* Check if unicode mode is active on at least one seat focusing
@@ -1934,7 +1934,7 @@ render_csd_title(struct terminal *term, const struct csd_data *info,
 {
     xassert(term->window->csd_mode == CSD_YES);
 
-    struct wl_surf_subsurf *surf = &term->window->csd.surface[CSD_SURF_TITLE];
+    struct wl_surf *surf = &term->window->csd.surface[CSD_SURF_TITLE];
     if (info->width == 0 || info->height == 0)
         return;
 

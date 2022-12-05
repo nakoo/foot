@@ -289,14 +289,14 @@ struct monitor {
     bool use_output_release;
 };
 
-struct wl_surf_subsurf {
+struct wl_surf {
     struct wl_surface *surf;
     struct wl_subsurface *sub;
 };
 
 struct wl_url {
     const struct url *url;
-    struct wl_surf_subsurf surf;
+    struct wl_surf surf;
 };
 
 enum csd_mode {CSD_UNKNOWN, CSD_NO, CSD_YES};
@@ -333,7 +333,7 @@ struct wl_window {
     enum csd_mode csd_mode;
 
     struct {
-        struct wl_surf_subsurf surface[CSD_SURF_COUNT];
+        struct wl_surf surface[CSD_SURF_COUNT];
         struct fcft_font *font;
         int move_timeout_fd;
         uint32_t serial;
@@ -344,10 +344,10 @@ struct wl_window {
         bool minimize:1;
     } wm_capabilities;
 
-    struct wl_surf_subsurf search;
-    struct wl_surf_subsurf scrollback_indicator;
-    struct wl_surf_subsurf render_timer;
-    struct wl_surf_subsurf overlay;
+    struct wl_surf search;
+    struct wl_surf scrollback_indicator;
+    struct wl_surf render_timer;
+    struct wl_surf overlay;
 
     struct wl_callback *frame_callback;
 
@@ -439,12 +439,12 @@ bool wayl_win_csd_titlebar_visible(const struct wl_window *win);
 bool wayl_win_csd_borders_visible(const struct wl_window *win);
 
 bool wayl_win_subsurface_new(
-    struct wl_window *win, struct wl_surf_subsurf *surf,
+    struct wl_window *win, struct wl_surf *surf,
     bool allow_pointer_input);
 bool wayl_win_subsurface_new_with_custom_parent(
     struct wl_window *win, struct wl_surface *parent,
-    struct wl_surf_subsurf *surf, bool allow_pointer_input);
-void wayl_win_subsurface_destroy(struct wl_surf_subsurf *surf);
+    struct wl_surf *surf, bool allow_pointer_input);
+void wayl_win_subsurface_destroy(struct wl_surf *surf);
 
 #if defined(HAVE_XDG_ACTIVATION)
 bool wayl_get_activation_token(
