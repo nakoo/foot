@@ -135,6 +135,12 @@ if wayland_protocols.version().version_compare('>=1.21')
   wl_proto_xml += [wayland_protocols_datadir + '/staging/xdg-activation/xdg-activation-v1.xml']
 endif
 
+# TODO: Update when this protocol is actually released
+if wayland_protocols.version().version_compare('>=1.21')
+  add_project_arguments('-DHAVE_SURFACE_INVALIDATION', language: 'c')
+  wl_proto_xml += [ wayland_protocols_datadir + '/staging/surface-invalidation/surface-invalidation-v1.xml']
+endif
+
 foreach prot : wl_proto_xml
   wl_proto_headers += custom_target(
     prot.underscorify() + '-client-header',

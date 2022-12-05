@@ -20,6 +20,10 @@
  #include <xdg-activation-v1.h>
 #endif
 
+#if defined(HAVE_SURFACE_INVALIDATION)
+ #include <surface-invalidation-v1.h>
+#endif
+
 #include <fcft/fcft.h>
 #include <tllist.h>
 
@@ -292,6 +296,9 @@ struct monitor {
 struct wl_surf {
     struct wl_surface *surf;
     struct wl_subsurface *sub;
+    struct terminal *term;
+
+    void (*invalidated)(struct terminal *term);
 };
 
 struct wl_url {
@@ -403,6 +410,10 @@ struct wayland {
 
 #if defined(HAVE_XDG_ACTIVATION)
     struct xdg_activation_v1 *xdg_activation;
+#endif
+
+#if defined(HAVE_SURFACE_INVALIDATION)
+    struct wp_surface_invalidation_manager_v1 *surface_invalidation_manager;
 #endif
 
     bool presentation_timings;

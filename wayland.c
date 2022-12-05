@@ -1124,6 +1124,17 @@ handle_global(void *data, struct wl_registry *registry,
             seat_add_text_input(&it->item);
     }
 #endif
+
+#if defined(HAVE_SURFACE_INVALIDATION) && HAVE_SURFACE_INVALIDATION
+    else if (strcmp(interface, wp_surface_invalidation_manager_v1_interface.name) == 0) {
+        const uint32_t required = 1;
+        if (!verify_iface_version(interface, version, required))
+            return;
+
+        wayl->surface_invalidation_manager = wl_registry_bind(
+            wayl->registry, name, &wp_surface_invalidation_manager_v1_interface, required);
+    }
+#endif
 }
 
 static void
@@ -1459,6 +1470,41 @@ wayl_destroy(struct wayland *wayl)
     free(wayl);
 }
 
+#if defined (HAVE_SURFACE_INVALIDATION)
+static void surface_invalidation_handle_invalidated(
+    void *data,
+    struct wp_surface_invalidation_v1 *wp_surface_invalidation_v1,
+    uint32_t serial)
+{
+    struct wl_surf *surf = data;
+
+    if (surf->invalidated == NULL)
+        return;
+
+    wp_surface_invalidation_v1_ack(wp_surface_invalidation_v1, serial);
+    surf->invalidated(surf->term);
+}
+
+static struct wp_surface_invalidation_v1_listener surface_invalidation_listener = {
+    .invalidated = surface_invalidation_handle_invalidated,
+};
+#endif
+
+static void
+init_wl_surf_inaviladion(struct terminal *term, struct wl_surf *surf) {
+    surf->term = term;
+#if defined (HAVE_SURFACE_INVALIDATION)
+    if (!term->wl->surface_invalidation_manager)
+        return;
+
+    struct wp_surface_invalidation_v1 *surface_invalidation
+        = wp_surface_invalidation_manager_v1_get_surface_invalidation(
+            term->wl->surface_invalidation_manager, surf->surf);
+    wp_surface_invalidation_v1_add_listener(surface_invalidation,
+        &surface_invalidation_listener, surf);
+#endif
+}
+
 struct wl_window *
 wayl_win_init(struct terminal *term, const char *token)
 {
@@ -1530,6 +1576,8 @@ wayl_win_init(struct terminal *term, const char *token)
         win->configure.csd_mode = CSD_YES;
         LOG_WARN("no decoration manager available - using CSDs unconditionally");
     }
+
+    init_wl_surf_inaviladion(term, &win->main);
 
     wl_surface_commit(win->main.surf);
 
@@ -1873,6 +1921,8 @@ wayl_win_subsurface_new_with_custom_parent(
 
     surf->surf = main_surface;
     surf->sub = sub;
+
+    init_wl_surf_inaviladion(win->term, surf);
     return true;
 }
 
