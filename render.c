@@ -1492,6 +1492,8 @@ render_overlay(struct terminal *term)
     struct wl_surf *overlay = &term->window->overlay;
     bool unicode_mode_active = false;
 
+    overlay->invalidated = render_overlay;
+
     /* Check if unicode mode is active on at least one seat focusing
      * this terminal instance */
     tll_foreach(term->wl->seats, it) {
@@ -2322,8 +2324,10 @@ render_csd(struct terminal *term)
         const int width = infos[i].width;
         const int height = infos[i].height;
 
-        struct wl_surface *surf = term->window->csd.surface[i].surf;
+        struct wl_surf *surf = &term->window->csd.surface[i];
         struct wl_subsurface *sub = term->window->csd.surface[i].sub;
+
+        surf->invalidated = render_csd;
 
         xassert(surf != NULL);
         xassert(sub != NULL);
@@ -2331,8 +2335,8 @@ render_csd(struct terminal *term)
         if (width == 0 || height == 0) {
             widths[i] = heights[i] = 0;
             wl_subsurface_set_position(sub, 0, 0);
-            wl_surface_attach(surf, NULL, 0, 0);
-            wl_surface_commit(surf);
+            wl_surface_attach(surf->surf, NULL, 0, 0);
+            wl_surface_commit(surf->surf);
             continue;
         }
 
@@ -2359,6 +2363,7 @@ render_scrollback_position(struct terminal *term)
         return;
 
     struct wl_window *win = term->window;
+    win->scrollback_indicator.invalidated = render_scrollback_position;
 
     if (term->grid->view == term->grid->offset) {
         if (win->scrollback_indicator.surf != NULL)
@@ -2689,6 +2694,9 @@ grid_render(struct terminal *term)
 
     if (term->shutdown.in_progress)
         return;
+
+    term->window->main.invalidated = grid_render;
+    term->window->render_timer.invalidated = grid_render;
 
     struct timespec start_time, start_double_buffering = {0}, stop_double_buffering = {0};
 
@@ -3023,6 +3031,7 @@ static void
 render_search_box(struct terminal *term)
 {
     xassert(term->window->search.sub != NULL);
+    term->window->search.invalidated = render_search_box;
 
     /*
      * We treat the search box pretty much like a row of cells. That
