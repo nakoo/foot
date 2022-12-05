@@ -838,7 +838,7 @@ xdg_surface_configure(void *data, struct xdg_surface *xdg_surface,
          * anytime soon. Some compositors require a commit in
          * combination with an ack - make them happy.
          */
-        wl_surface_commit(win->surface);
+        wl_surface_commit(win->main.surf);
     }
 
     if (wasnt_configured)
@@ -1194,7 +1194,7 @@ handle_global_remove(void *data, struct wl_registry *registry, uint32_t name)
 
             if (seat->wl_keyboard != NULL)
                 keyboard_listener.leave(
-                    seat, seat->wl_keyboard, -1, seat->kbd_focus->window->surface);
+                    seat, seat->wl_keyboard, -1, seat->kbd_focus->window->main.surf);
         }
 
         if (seat->mouse_focus != NULL) {
@@ -1204,7 +1204,7 @@ handle_global_remove(void *data, struct wl_registry *registry, uint32_t name)
 
             if (seat->wl_pointer != NULL)
                 pointer_listener.leave(
-                    seat, seat->wl_pointer, -1, seat->mouse_focus->window->surface);
+                    seat, seat->wl_pointer, -1, seat->mouse_focus->window->main.surf);
         }
 
         seat_destroy(seat);
@@ -1479,8 +1479,8 @@ wayl_win_init(struct terminal *term, const char *token)
     win->wm_capabilities.maximize = true;
     win->wm_capabilities.minimize = true;
 
-    win->surface = wl_compositor_create_surface(wayl->compositor);
-    if (win->surface == NULL) {
+    win->main.surf = wl_compositor_create_surface(wayl->compositor);
+    if (win->main.surf == NULL) {
         LOG_ERR("failed to create wayland surface");
         goto out;
     }
@@ -1491,14 +1491,14 @@ wayl_win_init(struct terminal *term, const char *token)
 
         if (region != NULL) {
             wl_region_add(region, 0, 0, INT32_MAX, INT32_MAX);
-            wl_surface_set_opaque_region(win->surface, region);
+            wl_surface_set_opaque_region(win->main.surf, region);
             wl_region_destroy(region);
         }
     }
 
-    wl_surface_add_listener(win->surface, &surface_listener, win);
+    wl_surface_add_listener(win->main.surf, &surface_listener, win);
 
-    win->xdg_surface = xdg_wm_base_get_xdg_surface(wayl->shell, win->surface);
+    win->xdg_surface = xdg_wm_base_get_xdg_surface(wayl->shell, win->main.surf);
     xdg_surface_add_listener(win->xdg_surface, &xdg_surface_listener, win);
 
     win->xdg_toplevel = xdg_surface_get_toplevel(win->xdg_surface);
@@ -1531,12 +1531,12 @@ wayl_win_init(struct terminal *term, const char *token)
         LOG_WARN("no decoration manager available - using CSDs unconditionally");
     }
 
-    wl_surface_commit(win->surface);
+    wl_surface_commit(win->main.surf);
 
 #if defined(HAVE_XDG_ACTIVATION)
     /* Complete XDG startup notification */
     if (token)
-        xdg_activation_v1_activate(wayl->xdg_activation, token, win->surface);
+        xdg_activation_v1_activate(wayl->xdg_activation, token, win->main.surf);
 #endif
 
     if (!wayl_win_subsurface_new(win, &win->overlay, false)) {
@@ -1619,8 +1619,8 @@ wayl_win_destroy(struct wl_window *win)
     wayl_roundtrip(win->term->wl);
 
         /* Main window */
-    wl_surface_attach(win->surface, NULL, 0, 0);
-    wl_surface_commit(win->surface);
+    wl_surface_attach(win->main.surf, NULL, 0, 0);
+    wl_surface_commit(win->main.surf);
     wayl_roundtrip(win->term->wl);
 
     tll_free(win->on_outputs);
@@ -1659,8 +1659,8 @@ wayl_win_destroy(struct wl_window *win)
         xdg_toplevel_destroy(win->xdg_toplevel);
     if (win->xdg_surface != NULL)
         xdg_surface_destroy(win->xdg_surface);
-    if (win->surface != NULL)
-        wl_surface_destroy(win->surface);
+    if (win->main.surf != NULL)
+        wl_surface_destroy(win->main.surf);
 
     wayl_roundtrip(win->term->wl);
 
@@ -1794,7 +1794,7 @@ activation_token_for_urgency_done(const char *token, void *data)
     struct wayland *wayl = win->term->wl;
 
     win->urgency_token_is_pending = false;
-    xdg_activation_v1_activate(wayl->xdg_activation, token, win->surface);
+    xdg_activation_v1_activate(wayl->xdg_activation, token, win->main.surf);
 }
 #endif /* HAVE_XDG_ACTIVATION */
 
@@ -1881,7 +1881,7 @@ wayl_win_subsurface_new(struct wl_window *win, struct wl_surf *surf,
                         bool allow_pointer_input)
 {
     return wayl_win_subsurface_new_with_custom_parent(
-        win, win->surface, surf, allow_pointer_input);
+        win, win->main.surf, surf, allow_pointer_input);
 }
 
 void
@@ -1960,7 +1960,7 @@ wayl_get_activation_token(
     if (seat != NULL && serial != 0)
         xdg_activation_token_v1_set_serial(token, serial, seat->wl_seat);
 
-    xdg_activation_token_v1_set_surface(token, win->surface);
+    xdg_activation_token_v1_set_surface(token, win->main.surf);
     xdg_activation_token_v1_add_listener(token, &activation_token_listener, ctx);
     xdg_activation_token_v1_commit(token);
     return true;

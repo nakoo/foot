@@ -320,7 +320,6 @@ struct xdg_activation_token_context {
 struct wayland;
 struct wl_window {
     struct terminal *term;
-    struct wl_surface *surface;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
 #if defined(HAVE_XDG_ACTIVATION)
@@ -344,6 +343,7 @@ struct wl_window {
         bool minimize:1;
     } wm_capabilities;
 
+    struct wl_surf main;
     struct wl_surf search;
     struct wl_surf scrollback_indicator;
     struct wl_surf render_timer;

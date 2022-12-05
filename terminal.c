@@ -3512,7 +3512,7 @@ term_single_shift(struct terminal *term, enum charset_designator idx)
 enum term_surface
 term_surface_kind(const struct terminal *term, const struct wl_surface *surface)
 {
-    if (likely(surface == term->window->surface))
+    if (likely(surface == term->window->main.surf))
         return TERM_SURF_GRID;
     else if (surface == term->window->csd.surface[CSD_SURF_TITLE].surf)
         return TERM_SURF_TITLE;

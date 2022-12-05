@@ -902,21 +902,21 @@ render_margin(struct terminal *term, struct buffer *buf,
     if (apply_damage) {
         /* Top */
         wl_surface_damage_buffer(
-            term->window->surface, 0, 0, term->width, term->margins.top);
+            term->window->main.surf, 0, 0, term->width, term->margins.top);
 
         /* Bottom */
         wl_surface_damage_buffer(
-            term->window->surface, 0, bmargin, term->width, term->margins.bottom);
+            term->window->main.surf, 0, bmargin, term->width, term->margins.bottom);
 
         /* Left */
         wl_surface_damage_buffer(
-            term->window->surface,
+            term->window->main.surf,
             0, term->margins.top + start_line * term->cell_height,
             term->margins.left, line_count * term->cell_height);
 
         /* Right */
         wl_surface_damage_buffer(
-            term->window->surface,
+            term->window->main.surf,
             rmargin, term->margins.top + start_line * term->cell_height,
             term->margins.right, line_count * term->cell_height);
     }
@@ -1019,7 +1019,7 @@ grid_render_scroll(struct terminal *term, struct buffer *buf,
 #endif
 
     wl_surface_damage_buffer(
-        term->window->surface, term->margins.left, dst_y,
+        term->window->main.surf, term->margins.left, dst_y,
         term->width - term->margins.left - term->margins.right, height);
 
     /*
@@ -1091,7 +1091,7 @@ grid_render_scroll_reverse(struct terminal *term, struct buffer *buf,
 #endif
 
     wl_surface_damage_buffer(
-        term->window->surface, term->margins.left, dst_y,
+        term->window->main.surf, term->margins.left, dst_y,
         term->width - term->margins.left - term->margins.right, height);
 
     /*
@@ -1140,7 +1140,7 @@ render_sixel_chunk(struct terminal *term, pixman_image_t *pix, const struct sixe
         x, y,
         width, height);
 
-    wl_surface_damage_buffer(term->window->surface, x, y, width, height);
+    wl_surface_damage_buffer(term->window->main.surf, x, y, width, height);
 }
 
 static void
@@ -1467,7 +1467,7 @@ render_ime_preedit_for_seat(struct terminal *term, struct seat *seat,
     free(real_cells);
 
     wl_surface_damage_buffer(
-        term->window->surface,
+        term->window->main.surf,
         term->margins.left,
         term->margins.top + row_idx * term->cell_height,
         term->width - term->margins.left - term->margins.right,
@@ -2685,6 +2685,8 @@ dirty_cursor(struct terminal *term)
 static void
 grid_render(struct terminal *term)
 {
+    xassert(term->window->main.sub == NULL);
+
     if (term->shutdown.in_progress)
         return;
 
@@ -2878,7 +2880,7 @@ grid_render(struct terminal *term)
                 int height = (r - first_dirty_row) * term->cell_height;
 
                 wl_surface_damage_buffer(
-                    term->window->surface, x, y, width, height);
+                    term->window->main.surf, x, y, width, height);
                 pixman_region32_union_rect(
                     &buf->dirty, &buf->dirty, 0, y, buf->width, height);
             }
@@ -2906,7 +2908,7 @@ grid_render(struct terminal *term)
         int width = term->width - term->margins.left - term->margins.right;
         int height = (term->rows - first_dirty_row) * term->cell_height;
 
-        wl_surface_damage_buffer(term->window->surface, x, y, width, height);
+        wl_surface_damage_buffer(term->window->main.surf, x, y, width, height);
         pixman_region32_union_rect(&buf->dirty, &buf->dirty, 0, y, buf->width, height);
     }
 
@@ -2973,17 +2975,17 @@ grid_render(struct terminal *term)
     xassert(term->grid->view >= 0 && term->grid->view < term->grid->num_rows);
 
     xassert(term->window->frame_callback == NULL);
-    term->window->frame_callback = wl_surface_frame(term->window->surface);
+    term->window->frame_callback = wl_surface_frame(term->window->main.surf);
     wl_callback_add_listener(term->window->frame_callback, &frame_listener, term);
 
-    wl_surface_set_buffer_scale(term->window->surface, term->scale);
+    wl_surface_set_buffer_scale(term->window->main.surf, term->scale);
 
     if (term->wl->presentation != NULL && term->conf->presentation_timings) {
         struct timespec commit_time;
         clock_gettime(term->wl->presentation_clock_id, &commit_time);
 
         struct wp_presentation_feedback *feedback = wp_presentation_feedback(
-            term->wl->presentation, term->window->surface);
+            term->wl->presentation, term->window->main.surf);
 
         if (feedback == NULL) {
             LOG_WARN("failed to create presentation feedback");
@@ -3007,14 +3009,14 @@ grid_render(struct terminal *term)
 
     if (term->conf->tweak.damage_whole_window) {
         wl_surface_damage_buffer(
-            term->window->surface, 0, 0, INT32_MAX, INT32_MAX);
+            term->window->main.surf, 0, 0, INT32_MAX, INT32_MAX);
     }
 
     xassert(buf->width % term->scale == 0);
     xassert(buf->height % term->scale == 0);
 
-    wl_surface_attach(term->window->surface, buf->wl_buf, 0, 0);
-    wl_surface_commit(term->window->surface);
+    wl_surface_attach(term->window->main.surf, buf->wl_buf, 0, 0);
+    wl_surface_commit(term->window->main.surf);
 }
 
 static void
