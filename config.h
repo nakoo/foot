@@ -326,6 +326,7 @@ struct config {
         bool overflowing_glyphs;
         bool grapheme_shaping;
         enum {
+            GRAPHEME_WIDTH_DEFAULT,
             GRAPHEME_WIDTH_WCSWIDTH,
             GRAPHEME_WIDTH_DOUBLE,
             GRAPHEME_WIDTH_MAX,

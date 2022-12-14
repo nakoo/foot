@@ -831,6 +831,32 @@ action_utf8_print(struct terminal *term, char32_t wc)
                 composed != NULL ? composed->width : base_width;
 
             switch (term->conf->tweak.grapheme_width_method) {
+            case GRAPHEME_WIDTH_DEFAULT:
+                if (last == 0x200d) {
+                    /* Last character is ZWJ - ignore this characters width */
+                    width = grapheme_width;
+                } else if ((wc >= 0x1f3fb && wc <= 0x1f3ff  /* skin-tone */) ||
+                           (wc >= 0x1f9b0 && wc <= 0x1f9b3  /* hair-style */))
+                {
+                    width = max(2, grapheme_width);
+                } else if (last >= 0x1f1e6 && last <= 0x1f1ff &&
+                           wc >= 0x1f1e6 && wc <= 0x1f1ff)
+                {
+                    /* Last character and this character are country
+                     * letters, meaning the grapheme is a flag */
+                    /* TODO: only do this for valid flag combinations */
+                    width = 2;
+                } else if (unlikely(wc == 0xfe0f)) {
+                    /* Variation selector 16 - graphical presentation */
+                    width = 2;
+                } else {
+                    /* Emulate wcswidth() */
+                    width += grapheme_width;
+                }
+
+                new_cc->width = width;
+                break;
+
             case GRAPHEME_WIDTH_MAX:
                 new_cc->width = max(grapheme_width, width);
                 break;

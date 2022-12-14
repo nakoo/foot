@@ -1229,21 +1229,63 @@ any of these options.
 
 *grapheme-width-method*
 	Selects which method to use when calculating the width
-	(i.e. number of columns) of a grapheme cluster. One of
-	*wcswidth*, *double-width* and *max*.
+	(i.e. number of columns) of a grapheme cluster. One of *default*,
+	*wcswidth*, *double-width* and *max*. See details below.
 	
-	*wcswidth* simply adds together the individual width of all
-	codepoints making up the cluster.
+	Background:
+	
+	Glyphs rendered in the terminal may be 1 or 2 columns wide. The
+	terminal emulator and the application running in the terminal must
+	agree what that width is, or you will see cursor
+	de-synchronization. This typically manifests itself as rendering
+	glitches and the cursor "jumping" when moving it over problematic
+	characters.
+	
+	Most glyphs consists of a single Unicode codepoint. In this case,
+	there is usually no issues.
+	
+	Some glyphs however consists of multiple codepoints. These are
+	called grapheme clusters, and can often be problematic.
+	
+	While there is a standard function to calculate the width of a
+	single codepoint (*wcwidth*(3p)), there is no such function for
+	calculating the width of a grapheme cluster.
+	
+	The closest thing we have is *wcswidth*(3p), that calculates the
+	width of a string. It is usually implemented by adding together
+	the widths of all codepoints that make up the string. This is not
+	correct for grapheme clusters. Take 👩🏾‍🚀for example (WOMAN
+	ASTRONAUT: MEDIUM-DARK SKIN TONE). It consists of 4 codepoints:
+	WOMAN + MEDIUM-DARK SKIN TONE + ZWJ + ROCKET. The sum of the
+	widths is 6.
+	
+	Some applications are better at calculating correct grapheme
+	cluster widths than other. The *grapheme-width-method* option lets
+	you choose the method that works best for your use case.
+	
+	*default* attempts to do "the right thing". When used with
+	applications that does not handle Unicode grapheme clusters
+	correctly, you will see cursor de-synchronization.
+	
+	*wcswidth* simply adds together the individual widths of all
+	codepoints making up the cluster. This is typically the most
+	compatible mode, at least for "older" applications.
+	
+	It will allocate too few cells for legacy emojis with an explicit
+	variation selector.
+	
+	It will allocate too many cells for complex emojis consisting of
+	multiple codepoints.
 	
 	*double-width* does the same, but limits the maximum number of
-	columns to 2. This is more correct, but may break some
-	applications since applications typically use *wcswidth*(3)
-	internally to calculate the width. This results in cursor
-	de-synchronization issues.
+	columns to 2. This is usually more correct, but like *default*,
+	will result in cursor de-synchronization when used with
+	applications that are not Unicode grapheme cluster
+	aware.
 	
 	*max* uses the width of the largest codepoint in the cluster.
 	
-	Default: _wcswidth_
+	Default: _default_
 
 *font-monospace-warn*
 	Boolean. When enabled, foot will use heuristics to try to verify
