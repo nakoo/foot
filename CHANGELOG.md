@@ -109,6 +109,10 @@
   config values (e.g. letter offsets, line height etc).
 * Selection being stuck visually when `IL` and `DL`.`
 * URL underlines sometimes still being visible after exiting URL mode.
+* Handling of Unicode Variation Selector-16 when
+  `grapheme-width-method` is set to either `max` or `wcswidth` (the
+  default). Before this, it was only handled correctly when
+  `grapheme-width-method=double-width`.
 
 [1173]: https://codeberg.org/dnkl/foot/issues/1173
 [1190]: https://codeberg.org/dnkl/foot/issues/1190

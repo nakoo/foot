@@ -832,6 +832,8 @@ action_utf8_print(struct terminal *term, char32_t wc)
 
             switch (term->conf->tweak.grapheme_width_method) {
             case GRAPHEME_WIDTH_MAX:
+                if (unlikely(wc == 0xfe0f))
+                    width = 2;
                 new_cc->width = max(grapheme_width, width);
                 break;
 
@@ -842,7 +844,10 @@ action_utf8_print(struct terminal *term, char32_t wc)
                 break;
 
             case GRAPHEME_WIDTH_WCSWIDTH:
-                new_cc->width = grapheme_width + width;
+                if (unlikely(wc == 0xfe0f))
+                    new_cc->width = 2;
+                else
+                    new_cc->width = grapheme_width + width;
                 break;
             }
 
