@@ -53,6 +53,9 @@
   set a value to the empty string, for example.
 * Environment variables can now be **unset**, by setting
   `[environment].<variable>=""` (quotes are required) ([#1225][1225])
+* New value for `[tweak].grapheme-width-method`: `default`. This mode
+  tries to do "the right thing", but may be incompatible with
+  especially older applications. It is the new default.
 
 [1136]: https://codeberg.org/dnkl/foot/issues/1136
 [1225]: https://codeberg.org/dnkl/foot/issues/1225
