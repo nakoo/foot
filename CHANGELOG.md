@@ -60,6 +60,9 @@
 
 ### Changed
 
+* `Control+Shift+u` now bound to `unicode-input` to follow the
+  convention established in GTK and Qt, `show-urls-launch` now bound
+  to `Control+Shift+o` ([#1183][1183])
 * Default color theme from a variant of the Zenburn theme, to a
   variant of the Solarized dark theme.
 * Default `pad` from 2x2 to 0x0 (i.e. no padding at all).
@@ -74,6 +77,7 @@
 
 [1166]: https://codeberg.org/dnkl/foot/issues/1166
 [1179]: https://codeberg.org/dnkl/foot/issues/1179
+[1183]: https://codeberg.org/dnkl/foot/issues/1183
 [1215]: https://codeberg.org/dnkl/foot/pulls/1215
 
 
