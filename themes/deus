@@ -1,5 +1,5 @@
 # Deus
-#Color palette based on: https://github.com/ajmwagar/vim-deus
+# Color palette based on: https://github.com/ajmwagar/vim-deus
 
 [cursor]
 color=2c323b eaeaea
