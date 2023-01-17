@@ -205,16 +205,16 @@ emit_notifications(int fd, const user_notifications_t *notifications)
 
 static noreturn void
 slave_exec(int ptmx, char *argv[], char *const envp[], int err_fd,
-           bool login_shell, const user_notifications_t *notifications)
+           bool login_shell, bool init, const user_notifications_t *notifications)
 {
     int pts = -1;
     const char *pts_name = ptsname(ptmx);
 
-    if (grantpt(ptmx) == -1) {
+    if (init && grantpt(ptmx) == -1) {
         LOG_ERRNO("failed to grantpt()");
         goto err;
     }
-    if (unlockpt(ptmx) == -1) {
+    if (init && unlockpt(ptmx) == -1) {
         LOG_ERRNO("failed to unlockpt()");
         goto err;
     }
@@ -222,7 +222,7 @@ slave_exec(int ptmx, char *argv[], char *const envp[], int err_fd,
     close(ptmx);
     ptmx = -1;
 
-    if (setsid() == -1) {
+    if (init && setsid() == -1) {
         LOG_ERRNO("failed to setsid()");
         goto err;
     }
@@ -233,7 +233,7 @@ slave_exec(int ptmx, char *argv[], char *const envp[], int err_fd,
         goto err;
     }
 
-    if (ioctl(pts, TIOCSCTTY, 0) < 0) {
+    if (init && ioctl(pts, TIOCSCTTY, 0) < 0) {
         LOG_ERRNO("failed to configure controlling terminal");
         goto err;
     }
@@ -254,7 +254,7 @@ slave_exec(int ptmx, char *argv[], char *const envp[], int err_fd,
     }
 #endif
 
-    if (tll_length(*notifications) > 0) {
+    if (notifications && tll_length(*notifications) > 0) {
         int flags = fcntl(pts, F_GETFL);
         if (flags < 0)
             goto err;
@@ -307,7 +307,7 @@ pid_t
 slave_spawn(int ptmx, int argc, const char *cwd, char *const *argv,
             char *const *envp, const env_var_list_t *extra_env_vars,
             const char *term_env, const char *conf_shell, bool login_shell,
-            const user_notifications_t *notifications)
+            bool init, const user_notifications_t *notifications)
 {
     int fork_pipe[2];
     if (pipe2(fork_pipe, O_CLOEXEC) < 0) {
@@ -393,7 +393,7 @@ slave_spawn(int ptmx, int argc, const char *cwd, char *const *argv,
             setenv("SHELL", shell_argv[0], 1);
 
         slave_exec(ptmx, shell_argv, envp != NULL ? envp : environ,
-                   fork_pipe[1], login_shell, notifications);
+                   fork_pipe[1], login_shell, init, notifications);
         BUG("Unexpected return from slave_exec()");
         break;
 

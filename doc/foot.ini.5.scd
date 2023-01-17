@@ -812,6 +812,20 @@ e.g. *search-start=none*.
 	
 	Default: _not bound_
 
+*exec*
+	Executes a slave process bound to the same tty as the main
+	session process. The syntax is similar to *pipe-visible* and
+	similar bindings.
+	
+	Note that the process is controlling the tty at the same time
+	as the currently running process and it can mess up completely
+	the terminal state. Be careful of what you configure.
+	
+	Example:
+		*exec=[clear] Control+Shift+l*
+	
+	Default: _not bound_
+
 *show-urls-launch*
 	Enter URL mode, where all currently visible URLs are tagged with a
 	jump label with a key sequence that will open the URL (and exit

@@ -108,6 +108,7 @@ static const char *const binding_action_map[] = {
     [BIND_ACTION_MINIMIZE] = "minimize",
     [BIND_ACTION_MAXIMIZE] = "maximize",
     [BIND_ACTION_FULLSCREEN] = "fullscreen",
+    [BIND_ACTION_EXEC] = "exec",
     [BIND_ACTION_PIPE_SCROLLBACK] = "pipe-scrollback",
     [BIND_ACTION_PIPE_VIEW] = "pipe-visible",
     [BIND_ACTION_PIPE_SELECTED] = "pipe-selected",

@@ -42,6 +42,7 @@
 #include "vt.h"
 #include "xmalloc.h"
 #include "xsnprintf.h"
+#include "slave.h"
 
 struct pipe_context {
     char *text;
@@ -202,6 +203,22 @@ execute_binding(struct seat *seat, struct terminal *term,
             xdg_toplevel_unset_fullscreen(term->window->xdg_toplevel);
         else
             xdg_toplevel_set_fullscreen(term->window->xdg_toplevel, NULL);
+        return true;
+
+    case BIND_ACTION_EXEC:
+        if (binding->aux->type != BINDING_AUX_PIPE)
+            return true;
+
+        int argc = 0;
+        while(binding->aux->pipe.args[argc]) argc++;
+
+        if (slave_spawn(
+             term->ptmx, argc, term->cwd, binding->aux->pipe.args, NULL,
+             &term->conf->env_vars, term->conf->term, NULL, false, false, NULL) == -1) {
+            LOG_ERRNO("failed to spawn slave for exec action");
+            return true;
+        }
+
         return true;
 
     case BIND_ACTION_PIPE_SCROLLBACK:
