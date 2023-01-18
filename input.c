@@ -332,6 +332,12 @@ execute_binding(struct seat *seat, struct terminal *term,
         return true;
     }
 
+    case BIND_ACTION_OUTPUT_TEXT_BINDING:
+        xassert(binding->aux->type == BINDING_AUX_TEXT);
+        vt_from_slave(term, binding->aux->text.data, binding->aux->text.len);
+        render_refresh(term);
+        return true;
+
     case BIND_ACTION_TEXT_BINDING:
         xassert(binding->aux->type == BINDING_AUX_TEXT);
         term_to_slave(term, binding->aux->text.data, binding->aux->text.len);

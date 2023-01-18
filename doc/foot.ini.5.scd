@@ -986,6 +986,10 @@ specify a character:
 - Bytes (e.g. ESC) are written as two-digit hexadecimal numbers, with
   a *\\x* prefix: *\\x1b*.
 
+If the text starts with the special escape sequence *\\o* then the text is not
+sent to the slave process input, but is processed by the terminal as if it was
+sent by the slave process.
+
 Example: you would like to remap _Super+k_ to the _Up_ key.
 
 The escape sequence for the Up key is _ESC [ A_ (without the
@@ -997,6 +1001,10 @@ name for the Super/logo key):
 Another example: to remap _Super+c_ to _Control+c_:
 
 *\\x03 = Mod4+c*
+
+Other example: you want to clear the terminal on _Ctrl+Shift+l_
+
+*\o\x1bc = Control+Shift+l*
 
 # SECTION: mouse-bindings
 

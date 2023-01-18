@@ -2254,6 +2254,7 @@ parse_section_text_bindings(struct context *ctx)
     uint8_t *data = xmalloc(key_len + 1);
     size_t data_len = 0;
     bool esc = false;
+    int action = BIND_ACTION_TEXT_BINDING;
 
     for (size_t i = 0; i < key_len; i++) {
         if (key[i] == '\\') {
@@ -2267,6 +2268,11 @@ parse_section_text_bindings(struct context *ctx)
         }
 
         else if (esc) {
+            if (i == 1 && key[i] == 'o') {
+                esc = false;
+                action = BIND_ACTION_OUTPUT_TEXT_BINDING;
+                continue;
+            }
             if (key[i] != 'x') {
                 ctx->value = "";
                 LOG_CONTEXTUAL_ERR("invalid escaped character: %c", key[i]);
@@ -2305,7 +2311,7 @@ parse_section_text_bindings(struct context *ctx)
         },
     };
 
-    if (!value_to_key_combos(ctx, BIND_ACTION_TEXT_BINDING, &aux,
+    if (!value_to_key_combos(ctx, action, &aux,
                              &conf->bindings.key, KEY_BINDING))
     {
         goto err;
