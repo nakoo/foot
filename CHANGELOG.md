@@ -54,6 +54,14 @@
   `CSI R`. The kitty keyboard protocol originally allowed F3 to be
   encoded as `CSI R`, but this was removed from the specification
   since `CSI R` conflicts with the _”Cursor Position Report”_.
+* Foot server systemd units now use the standard
+  graphical-session.target ([#1281][1281]).
+* If `$XDG_RUNTIME_DIR/foot-$WAYLAND_DISPLAY.sock` does not exist,
+  `footclient` now tries `$XDG_RUNTIME_DIR/foot.sock`, then
+  `/tmp/foot.sock`, even if `$WAYLAND_DISPLAY` and/or
+  `$XDG_RUNTIME_DIR` are defined ([#1281][1281]).
+
+[1281]: https://codeberg.org/dnkl/foot/pulls/1281
 
 
 ### Deprecated
