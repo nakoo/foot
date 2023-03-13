@@ -631,7 +631,7 @@ render_cell(struct terminal *term, pixman_image_t *pix, pixman_region32_t *damag
         case COLOR_BASE16:
         case COLOR_BASE256:
             xassert(cell->attrs.ul < ALEN(term->colors.table));
-            _ul = term->colors.table[cell->attrs.bg];
+            _ul = term->colors.table[cell->attrs.ul];
             break;
 
         case COLOR_DEFAULT:
