@@ -344,8 +344,10 @@ empty string to be set, but it must be quoted: *KEY=""*)
 	some cases, the number of physical _cores_ is better.
 
 *utempter*
-	Path to utempter helper binary. Set to *none* to disable utmp
+	Path to _@utempter_name@_ helper binary. Set to *none* to disable utmp
 	records. Default: _@utempter@_.
+	Foot will execute the binary with _@utempter_add@_ when starting
+	and with _@utempter_del@_ when exiting.
 
 # SECTION: environment
 

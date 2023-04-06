@@ -18,28 +18,40 @@ endif
 
 utempter_path = get_option('default-utempter-path')
 if utempter_path == ''
-  utempter = find_program(
-    'utempter',
-    required: false,
-    dirs: [join_paths(get_option('prefix'), get_option('libdir'), 'utempter'),
-           join_paths(get_option('prefix'), get_option('libexecdir'), 'utempter'),
-           '/usr/lib/utempter',
-           '/usr/libexec/utempter',
-           '/lib/utempter']
-  )
-  if utempter.found()
-    utempter_path = utempter.full_path()
+  host_system = host_machine.system()
+  if host_system == 'linux'
+    utempter_path = join_paths(get_option('libdir'),'/utempter/utempter')
+    utempter_add = 'add'
+    utempter_name = 'utempter'
+    utempter_del_arguments = true
+    utempter_del = 'del'
+  elif host_system == 'freebsd'
+    utempter_path = '/usr/libexec/ulog-helper'
+    utempter_name = 'ulog-helper'
+    utempter_add = 'login'
+    utempter_del_arguments = false
+    utempter_del = 'logout'
   else
     utempter_path = ''
+    utempter_add = ''
+    utempter_del = ''
+    utempter_del_arguments = false
   endif
 elif utempter_path == 'none'
   utempter_path = ''
+  utempter_add = ''
+  utempter_del = ''
+  utempter_del_arguments = false
 endif
 
 add_project_arguments(
   ['-D_GNU_SOURCE=200809L',
    '-DFOOT_DEFAULT_TERM="@0@"'.format(get_option('default-terminfo')),
+   '-DFOOT_UTEMPTER_ADD="@0@"'.format(utempter_add),
+   '-DFOOT_UTEMPTER_DEL="@0@"'.format(utempter_del),
    '-DFOOT_DEFAULT_UTEMPTER_PATH="@0@"'.format(utempter_path)] +
+  (utempter_del_arguments
+    ? [ '-DFOOT_UTEMPTER_DEL_ARGUMENTS' ] : []) +
   (is_debug_build
     ? ['-D_DEBUG']
    : [cc.get_supported_arguments('-fno-asynchronous-unwind-tables')]) +

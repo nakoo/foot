@@ -4,6 +4,7 @@ scdoc_prog = find_program(scdoc.get_variable('scdoc'), native: true)
 
 if utempter_path == ''
   default_utempter_value = 'not set'
+  utempter_name = 'none'
 else
   default_utempter_value = utempter_path
 endif
@@ -12,6 +13,9 @@ conf_data = configuration_data(
   {
     'default_terminfo': get_option('default-terminfo'),
     'utempter': default_utempter_value,
+    'utempter_name': utempter_name,
+    'utempter_add': utempter_add,
+    'utempter_del': utempter_del,
   }
 )
 
