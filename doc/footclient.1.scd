@@ -75,7 +75,7 @@ terminal has terminated.
 
 *-d*,*--log-level*={*info*,*warning*,*error*,*none*}
 	Log level, used both for log output on stderr as well as
-	syslog. Default: _info_.
+	syslog. Default: _warning_.
 
 *-l*,*--log-colorize*=[{*never*,*always*,*auto*}]
 	Enables or disables colorization of log output on stderr.
@@ -89,7 +89,7 @@ terminal has terminated.
 
 # EXIT STATUS
 
-Footlient will exit with code 220 if there is a failure in footclient
+Footclient will exit with code 220 if there is a failure in footclient
 itself (for example, the server socket does not exist).
 
 If *-N*,*--no-wait* is used, footclient exits with code 0 as soon as
@@ -157,6 +157,17 @@ terminfo entries manually, by copying *foot* and *foot-direct* to
 *COLORTERM*
 	This variable is set to *truecolor*, to indicate to client
 	applications that 24-bit RGB colors are supported.
+
+*TERM_PROGRAM*
+	Always set to *foot*. This can be used by client applications to
+	check which terminal is in use, but with the caveat that it may
+	have been inherited from a parent process in other terminals that
+	aren't known to set the variable.
+
+*TERM_PROGRAM_VERSION*
+	Set to the foot version string, in the format _major_*.*_minor_*.*_patch_
+	or _major_*.*_minor_*.*_patch_*-*_revision_*-\g*_commit_ for inter-release
+	builds. The same caveat as for *TERM_PROGRAM* applies.
 
 In addition to the variables listed above, custom environment
 variables may be defined in *foot.ini*(5).

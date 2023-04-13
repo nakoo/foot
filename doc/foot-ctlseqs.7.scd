@@ -22,7 +22,7 @@ This document describes all the control sequences supported by foot.
 
 [[ *Sequence*
 :[ *Name*
-:[ *Description*
+:< *Description*
 |  \\a
 :  BEL
 :  Depends on what *bell* in *foot.ini*(5) is set to.
@@ -60,7 +60,7 @@ equivalent to 8-bit C1 controls.
 [[ *Sequence*
 :[ *Name*
 :[ *Origin*
-:[ *Description*
+:< *Description*
 |  \\E 7
 :  DECSC
 :  VT100
@@ -140,7 +140,7 @@ single CSI sequence by separating them with semicolons: *\\E[ 1;2;3
 m*.
 
 [[ *Parameter*
-:[ *Description*
+:< *Description*
 |  0
 :  Reset all attributes
 |  1
@@ -223,7 +223,7 @@ following 4 escape sequences:
 
 [[ *Sequence*
 :[ *Name*
-:[ *Description*
+:< *Description*
 |  \\E[ ? _Pm_ h
 :  DECSET
 :  Enable private mode
@@ -243,7 +243,7 @@ that corresponds to one of the following modes:
 
 [[ *Parameter*
 :[ *Origin*
-:[ *Description*
+:< *Description*
 |  1
 :  VT100
 :  Cursor keys mode (DECCKM)
@@ -344,7 +344,7 @@ manipulation sequences. The generic format is:
 
 [[ *Parameter 1*
 :[ *Parameter 2*
-:[ *Description*
+:< *Description*
 |  11
 :  -
 :  Report if window is iconified. Foot always reports *1* - not iconified.
@@ -394,7 +394,7 @@ manipulation sequences. The generic format is:
 [[ *Parameter*
 :[ *Name*
 :[ *Origin*
-:[ *Description*
+:< *Description*
 |  \\E[ _Ps_ c
 :  DA
 :  VT100
@@ -504,7 +504,7 @@ manipulation sequences. The generic format is:
 |  \\E[ = _Ps_ c
 :  DA3
 :  VT510
-:  send tertiary device attributes. Foot responds with "FOOT", in
+:  Send tertiary device attributes. Foot responds with "FOOT", in
    hexadecimal.
 |  \\E[ _Pm_ d
 :  VPA
@@ -595,7 +595,7 @@ All _OSC_ sequences begin with *\\E]*, sometimes abbreviated _OSC_.
 
 [[ *Sequence*
 :[ *Origin*
-:[ *Description*
+:< *Description*
 |  \\E] 0 ; _Pt_ \\E\\ 
 :  xterm
 :  Set window icon and title to _Pt_ (foot does not support setting the
@@ -693,7 +693,7 @@ All _DCS_ sequences begin with *\\EP* (sometimes abbreviated _DCS_),
 and are terminated by *\\E\\* (ST).
 
 [[ *Sequence*
-:[ *Description*
+:< *Description*
 |  \\EP q <sixel data> \\E\\ 
 :  Emit a sixel image at the current cursor position
 |  \\P $ q <query> \\E\\ 
@@ -703,7 +703,7 @@ and are terminated by *\\E\\* (ST).
 :  Begin (_C_=*1*) or end (_C_=*2*) application synchronized updates.
    This sequence is supported for compatibility reasons, but it's
    recommended to use private mode 2026 (see above) instead.
-|  \\EP + q <hex encoded capability name> \\E\\
+|  \\EP + q <hex encoded capability name> \\E\\ 
 :  Query builtin terminfo database (XTGETTCAP)
 
 

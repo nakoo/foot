@@ -142,7 +142,7 @@ the foot command line
 
 *-d*,*--log-level*={*info*,*warning*,*error*,*none*}
 	Log level, used both for log output on stderr as well as
-	syslog. Default: _info_.
+	syslog. Default: _warning_.
 
 *-l*,*--log-colorize*=[{*never*,*always*,*auto*}]
 	Enables or disables colorization of log output on stderr. Default:
@@ -543,9 +543,23 @@ In all other cases, the exit code is that of the client application
 	set according to either the *--term* command-line option or the
 	*term* config option in *foot.ini*(5).
 
+*PWD*
+	Current working directory (at the time of launching foot)
+
 *COLORTERM*
 	This variable is set to *truecolor*, to indicate to client
 	applications that 24-bit RGB colors are supported.
+
+*TERM_PROGRAM*
+	Always set to *foot*. This can be used by client applications to
+	check which terminal is in use, but with the caveat that it may
+	have been inherited from a parent process in other terminals that
+	aren't known to set the variable.
+
+*TERM_PROGRAM_VERSION*
+	Set to the foot version string, in the format _major_*.*_minor_*.*_patch_
+	or _major_*.*_minor_*.*_patch_*-*_revision_*-\g*_commit_ for inter-release
+	builds. The same caveat as for *TERM_PROGRAM* applies.
 
 In addition to the variables listed above, custom environment
 variables may be defined in *foot.ini*(5).
@@ -561,7 +575,7 @@ the same issue.
 The report should contain the following:
 
 - Foot version (*foot --version*).
-- Log output from foot (start foot from another terminal).
+- Log output from foot (run *foot -d info* from another terminal).
 - Which Wayland compositor (and version) you are running.
 - If reporting a crash, please try to provide a *bt full* backtrace
   with symbols.

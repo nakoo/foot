@@ -86,7 +86,7 @@ selection_on_rows(const struct terminal *term, int row_start, int row_end)
     const int rel_row_start =
         grid_row_abs_to_sb_precalc_sb_start(grid, sb_start, row_start);
     const int rel_row_end =
-        grid_row_abs_to_sb_precalc_sb_start(grid, sb_start, row_start);
+        grid_row_abs_to_sb_precalc_sb_start(grid, sb_start, row_end);
     int rel_sel_start =
         grid_row_abs_to_sb_precalc_sb_start(grid, sb_start, start->row);
     int rel_sel_end =
@@ -133,13 +133,18 @@ selection_scroll_down(struct terminal *term, int rows)
 {
     xassert(term->selection.coords.end.row >= 0);
 
+    const struct grid *grid = term->grid;
+    const struct range *sel = &term->selection.coords;
+
+    const int screen_end =
+        grid_row_abs_to_sb(grid, term->rows, grid->offset + term->rows - 1);
     const int rel_row_start =
-        grid_row_abs_to_sb(term->grid, term->rows, term->selection.coords.start.row);
+        grid_row_abs_to_sb(term->grid, term->rows, sel->start.row);
     const int rel_row_end =
-        grid_row_abs_to_sb(term->grid, term->rows, term->selection.coords.end.row);
+        grid_row_abs_to_sb(term->grid, term->rows, sel->end.row);
     const int actual_end = max(rel_row_start, rel_row_end);
 
-    if (actual_end + rows <= term->grid->num_rows) {
+    if (actual_end > screen_end - rows) {
         /* Part of the selection will be scrolled out, cancel it */
         selection_cancel(term);
     }

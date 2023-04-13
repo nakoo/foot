@@ -210,6 +210,8 @@ grid_snapshot(const struct grid *grid)
     clone->offset = grid->offset;
     clone->view = grid->view;
     clone->cursor = grid->cursor;
+    clone->saved_cursor = grid->saved_cursor;
+    clone->kitty_kbd = grid->kitty_kbd;
     clone->rows = xcalloc(grid->num_rows, sizeof(clone->rows[0]));
     memset(&clone->scroll_damage, 0, sizeof(clone->scroll_damage));
     memset(&clone->sixel_images, 0, sizeof(clone->sixel_images));
@@ -285,6 +287,9 @@ grid_snapshot(const struct grid *grid)
 void
 grid_free(struct grid *grid)
 {
+    if (grid == NULL)
+        return;
+
     for (int r = 0; r < grid->num_rows; r++)
         grid_row_free(grid->rows[r]);
 
@@ -483,6 +488,8 @@ grid_resize_without_reflow(
     grid->saved_cursor.point = saved_cursor;
 
     grid->cur_row = new_grid[(grid->offset + cursor.row) & (new_rows - 1)];
+    xassert(grid->cur_row != NULL);
+
     grid->cursor.lcf = false;
     grid->saved_cursor.lcf = false;
 
@@ -786,7 +793,7 @@ grid_resize_and_reflow(
 
             /*
              * Set end-coordinate for this chunk, by finding the next
-             * point-of-interrest on this row.
+             * point-of-interest on this row.
              *
              * If there are no more tracking points, or URI ranges,
              * the end-coordinate will be at the end of the row,
@@ -1045,6 +1052,8 @@ grid_resize_and_reflow(
     saved_cursor.col = min(saved_cursor.col, new_cols - 1);
 
     grid->cur_row = new_grid[(grid->offset + cursor.row) & (new_rows - 1)];
+    xassert(grid->cur_row != NULL);
+
     grid->cursor.point = cursor;
     grid->saved_cursor.point = saved_cursor;
 

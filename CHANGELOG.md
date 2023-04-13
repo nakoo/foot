@@ -1,6 +1,7 @@
 # Changelog
 
 * [Unreleased](#unreleased)
+* [1.14.0](#1-14-0)
 * [1.13.1](#1-13-1)
 * [1.13.0](#1-13-0)
 * [1.12.1](#1-12-1)
@@ -42,6 +43,24 @@
 
 
 ## Unreleased
+### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+
+* Incorrect icon in dock and window switcher on Gnome ([#1317][1317])
+* Crash when scrolling after resizing the window with non-zero
+  scrolling regions.
+
+[1317]: https://codeberg.org/dnkl/foot/issues/1317
+
+
+### Security
+### Contributors
+
+
+## 1.14.0
 
 ### Added
 
@@ -49,8 +68,24 @@
 * Support (optional) for utmp logging with libutempter.
 * `kxIN` and `kxOUT` (focus in/out events) to terminfo.
 * `name` capability to `XTGETTCAP`.
+* String values in `foot.ini` may now be quoted. This can be used to
+  set a value to the empty string, for example.
+* Environment variables can now be **unset**, by setting
+  `[environment].<variable>=""` (quotes are required) ([#1225][1225]).
+* `font-size-adjustment=N[px]` option, letting you configure how much
+  to increment/decrement the font size when zooming in or out
+  ([#1188][1188]).
+* Bracketed paste terminfo entries (`BD`, `BE`, `PE` and `PS`, added
+  to ncurses in 2022-12-24). Vim makes use of these.
+* “Report version” terminfo entries (`XR`/`xr`).
+* “Report DA2” terminfo entries (`RV`/`rv`).
+* `XF` terminfo capability (focus in/out events available).
+* `$TERM_PROGRAM` and `$TERM_PROGRAM_VERSION` environment variables
+  set in the slave process.
 
 [1136]: https://codeberg.org/dnkl/foot/issues/1136
+[1225]: https://codeberg.org/dnkl/foot/issues/1225
+[1188]: https://codeberg.org/dnkl/foot/issues/1188
 
 
 ### Changed
@@ -64,13 +99,20 @@
   ("permanently reset") instead of `2` ("reset") for DEC private
   modes that are known but unsupported.
 * Set `PWD` environment variable in the slave process ([#1179][1179]).
+* DPI is now forced to 96 when found to be unreasonably high.
+* Set default log level to warning ([#1215][1215]).
+* Default `grapheme-width-method` from `wcswidth` to `double-width`.
+* When determining initial font size, do FontConfig config
+  substitution if the user-provided font pattern has no {pixel}size
+  option ([#1287][1287]).
+* DECRST of DECCOLM and DECSCLM removed from terminfo.
 
 [1166]: https://codeberg.org/dnkl/foot/issues/1166
 [1179]: https://codeberg.org/dnkl/foot/issues/1179
+[1215]: https://codeberg.org/dnkl/foot/pulls/1215
+[1287]: https://codeberg.org/dnkl/foot/issues/1287
 
 
-### Deprecated
-### Removed
 ### Fixed
 
 * Crash in `foot --server` on key press, after another `footclient`
@@ -80,16 +122,76 @@
   that does not allow Wayland buffer re-use (e.g. KDE/plasma)
   ([#1173][1173])
 * Scrollback search matches not being highlighted correctly, on
-  compositors that does now allow Wayland buffer re-use
+  compositors that does not allow Wayland buffer re-use
   (e.g. KDE/plasma).
+* Nanosecs "overflow" when calculating timeout value for
+  `resize-delay-ms` option.
+* Missing backslash in ST terminator in escape sequences in the
+  built-in terminfo (accessed via XTGETTCAP).
+* Crash when interactively resizing the window with a very large
+  scrollback.
+* Crash when a sixel image exceeds the current sixel max height.
+* Crash after reverse-scrolling (`CSI Ps T`) in the ‘normal’
+  (non-alternate) screen ([#1190][1190]).
+* Background transparency being applied to the text "behind" the
+  cursor. Only applies to block cursor using inversed fg/bg
+  colors. ([#1205][1205]).
+* Crash when monitor’s physical size is "too small" ([#1209][1209]).
+* Line-height adjustment when incrementing/decrementing the font size
+  with a user-set line-height ([#1218][1218]).
+* Scaling factor not being correctly applied when converting pt-or-px
+  config values (e.g. letter offsets, line height etc).
+* Selection being stuck visually when `IL` and `DL`.
+* URL underlines sometimes still being visible after exiting URL mode.
+* Text-bindings, and pipe-* bindings, with multiple key mappings
+  causing a crash (double-free) on exit ([#1259][1259]).
+* Double-width glyphs glitching when surrounded by glyphs overflowing
+  into the double-width glyph ([#1256][1256]).
+* Wayland protocol violation when ack:ing a configure event for an
+  unmapped surface ([#1249][1249]).
+* `xdg_toplevel::set_min_size()` not being called.
+* Key bindings with consumed modifiers masking other key bindings
+  ([#1280][1280]).
+* Multi-character compose sequences with the kitty keyboard protocol
+  ([#1288][1288]).
+* Crash when application output scrolls very fast, e.g. `yes`
+  ([#1305][1305]).
+* Crash when application scrolls **many** lines (> ~2³¹).
+* DECCOLM erasing the screen ([#1265][1265]).
 
 [1173]: https://codeberg.org/dnkl/foot/issues/1173
+[1190]: https://codeberg.org/dnkl/foot/issues/1190
+[1205]: https://codeberg.org/dnkl/foot/issues/1205
+[1209]: https://codeberg.org/dnkl/foot/issues/1209
+[1218]: https://codeberg.org/dnkl/foot/issues/1218
+[1259]: https://codeberg.org/dnkl/foot/issues/1259
+[1256]: https://codeberg.org/dnkl/foot/issues/1256
+[1249]: https://codeberg.org/dnkl/foot/issues/1249
+[1280]: https://codeberg.org/dnkl/foot/issues/1280
+[1288]: https://codeberg.org/dnkl/foot/issues/1288
+[1305]: https://codeberg.org/dnkl/foot/issues/1305
+[1265]: https://codeberg.org/dnkl/foot/issues/1265
 
 
-### Security
 ### Contributors
 
+* Alexey Sakovets
+* Andrea Pappacoda
+* Antoine Beaupré
+* argosatcore
 * Craig Barnes
+* EuCaue
+* Grigory Kirillov
+* Harri Nieminen
+* Hugo Osvaldo Barrera
+* jaroeichler
+* Joakim Nohlgård
+* Nick Hastings
+* Soren A D
+* Torsten Trautwein
+* Vladimír Magyar
+* woojiq
+* Yorick Peterse
 
 
 ## 1.13.1

@@ -22,6 +22,15 @@ in this order:
 An example configuration file containing all options with their default value
 commented out will usually be installed to */etc/xdg/foot/foot.ini*.
 
+Options are set using KEY=VALUE pairs:
+
+	*\[colors\]*++
+*background=000000*++
+*foreground=ffffff*
+
+Empty values (*KEY=*) are not supported. String options do allow the
+empty string to be set, but it must be quoted: *KEY=""*)
+
 # SECTION: main
 
 *shell*
@@ -70,6 +79,19 @@ commented out will usually be installed to */etc/xdg/foot/foot.ini*.
 	
 	Default: _monospace:size=8_ (*font*), _not set_ (*font-bold*,
 	*font-italic*, *font-bold-italic*).
+
+*font-size-adjustment*
+	Amount, in _points_, _pixels_ or _percent_, to increment/decrement
+	the font size when zooming in our out.
+	
+	Examples:
+	```
+	font-size-adjustment=0.5   # Adjust by 0.5 points
+	font-size-adjustment=10xp  # Adjust by 10 pixels
+	font-size-adjustment=7.5%  # Adjust by 7.5 percent
+	```
+	
+	Default: _0.5_
 
 *include*
 	Absolute path to configuration file to import.
@@ -213,15 +235,19 @@ commented out will usually be installed to */etc/xdg/foot/foot.ini*.
 	Default: _0x0_.
 
 *resize-delay-ms*
-	Time, in milliseconds, of "idle time" before foot sends the new
-	window dimensions to the client application while doing an
-	interactive resize of a foot window. Idle time in this context is
-	a period of time where the window size is not changing.
+
+	Time, in milliseconds, of "idle time" before foot performs text
+	reflow, and sends the new window dimensions to the client
+	application while doing an interactive resize of a foot
+	window. Idle time in this context is a period of time where the
+	window size is not changing.
 	
 	In other words, while you are fiddling with the window size, foot
-	does not send the updated dimensions to the client. Only when you
-	pause the fiddling for *resize-delay-ms* milliseconds is the
-	client updated.
+	does not send the updated dimensions to the client. It also does a
+	fast "truncating" resize of the grid, instead of actually
+	reflowing the contents. Only when you pause the fiddling for
+	*resize-delay-ms* milliseconds is the client updated, and the
+	contents properly reflowed.
 	
 	Emphasis is on _while_ here; as soon as the interactive resize
 	ends (i.e. when you let go of the window border), the final
@@ -339,7 +365,7 @@ Note: do not set *TERM* here; use the *term* option in the main
 *urgent*
 	When set to _yes_, foot will signal urgency to the compositor
 	through the XDG activation protocol whenever *BEL* is received,
-	and the window does NOT have keyboard foccus.
+	and the window does NOT have keyboard focus.
 	
 	If the compositor does not implement this protocol, the margins
 	will be painted in red instead.
@@ -448,14 +474,13 @@ applications can change these at runtime.
 	by applications. Default: _no_.
 
 *color*
-	Two RRGGBB values (i.e. plain old 6-digit hex values, without
-	prefix) specifying the foreground (text) and background (cursor)
-	colors for the cursor.
+	Two space separated RRGGBB values (i.e. plain old 6-digit hex
+	values, without prefix) specifying the foreground (text) and
+	background (cursor) colors for the cursor.
 	
-	Default: _inverse foreground/background colors_.
-
-	Note that this value only applies to the block cursor. The other
-	cursor styles are always rendered with the foreground color.
+	Example: *ff0000 00ff00* (green cursor, red text)
+	
+	Default: the regular foreground and background colors, reversed.
 
 *beam-thickness*
 	Thickness (width) of the beam styled cursor. The value is in
@@ -551,7 +576,7 @@ can configure the background transparency with the _alpha_ option.
 	options are unconfigured). 24-bit RGB colors will typically fall
 	into this category.
 	
-	Note that applications can change the *regularN* and *brighN*
+	Note that applications can change the *regularN* and *brightN*
 	colors at runtime. However, they have no way of changing the
 	*dimN* colors. If an application has changed the *regularN*
 	colors, foot will still use the corresponding *dimN* color, as
@@ -939,7 +964,7 @@ Be careful; do not use single-letter keys that are also used in
 	original text.
 	
 	But with e.g. OSC-8 URLs (the terminal version of HTML anchors,
-	i.e. "links"), the text on the screen can be something completey
+	i.e. "links"), the text on the screen can be something completely
 	different than the URL.
 	
 	This action toggles between showing and hiding the URL on the jump
@@ -1235,7 +1260,7 @@ any of these options.
 	
 	*max* uses the width of the largest codepoint in the cluster.
 	
-	Default: _wcswidth_
+	Default: _double-width_
 
 *font-monospace-warn*
 	Boolean. When enabled, foot will use heuristics to try to verify

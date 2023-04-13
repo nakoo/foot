@@ -370,8 +370,8 @@ output_update_ppi(struct monitor *mon)
     if (mon->dim.mm.width <= 0 || mon->dim.mm.height <= 0)
         return;
 
-    int x_inches = mon->dim.mm.width * 0.03937008;
-    int y_inches = mon->dim.mm.height * 0.03937008;
+    double x_inches = mon->dim.mm.width * 0.03937008;
+    double y_inches = mon->dim.mm.height * 0.03937008;
 
     mon->ppi.real.x = mon->dim.px_real.width / x_inches;
     mon->ppi.real.y = mon->dim.px_real.height / y_inches;
@@ -407,8 +407,16 @@ output_update_ppi(struct monitor *mon)
     mon->ppi.scaled.x = scaled_width / x_inches;
     mon->ppi.scaled.y = scaled_height / y_inches;
 
-    float px_diag = sqrt(pow(scaled_width, 2) + pow(scaled_height, 2));
+    double px_diag = sqrt(pow(scaled_width, 2) + pow(scaled_height, 2));
     mon->dpi = px_diag / mon->inch * mon->scale;
+
+    if (mon->dpi > 1000) {
+        if (mon->name != NULL) {
+            LOG_WARN("%s: DPI=%f is unreasonable, using 96 instead",
+                     mon->name, mon->dpi);
+        }
+        mon->dpi = 96;
+    }
 }
 
 static void
@@ -760,6 +768,16 @@ xdg_surface_configure(void *data, struct xdg_surface *xdg_surface,
 
     struct wl_window *win = data;
     struct terminal *term = win->term;
+
+    if (win->unmapped) {
+        /*
+         * https://codeberg.org/dnkl/foot/issues/1249
+         * https://gitlab.freedesktop.org/wlroots/wlroots/-/issues/3487
+         * https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/3719
+         * https://gitlab.freedesktop.org/wayland/wayland-protocols/-/issues/108
+         */
+        return;
+    }
 
     bool wasnt_configured = !win->is_configured;
     bool was_resizing = win->is_resizing;
@@ -1611,6 +1629,7 @@ wayl_win_destroy(struct wl_window *win)
     wayl_roundtrip(win->term->wl);
 
         /* Main window */
+    win->unmapped = true;
     wl_surface_attach(win->surface, NULL, 0, 0);
     wl_surface_commit(win->surface);
     wayl_roundtrip(win->term->wl);
@@ -1696,7 +1715,8 @@ wayl_reload_xcursor_theme(struct seat *seat, int new_scale)
     const char *xcursor_theme = getenv("XCURSOR_THEME");
 
     LOG_INFO("cursor theme: %s, size: %d, scale: %d",
-             xcursor_theme, xcursor_size, new_scale);
+             xcursor_theme ? xcursor_theme : "(null)",
+             xcursor_size, new_scale);
 
     seat->pointer.theme = wl_cursor_theme_load(
         xcursor_theme, xcursor_size * new_scale, seat->wayl->shm);
@@ -1915,7 +1935,7 @@ activation_token_done(void *data, struct xdg_activation_token_v1 *xdg_token,
         return;
     }
 
-    xassert(false);
+    BUG("activation token not found in list");
 }
 
 static const struct

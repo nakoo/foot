@@ -503,8 +503,48 @@ value_to_double(struct context *ctx, float *res)
 static bool NOINLINE
 value_to_str(struct context *ctx, char **res)
 {
+    char *copy = xstrdup(ctx->value);
+    char *end = copy + strlen(copy) - 1;
+
+    /* Un-quote
+     *
+     * Note: this is very simple; we only support the *entire* value
+     * being quoted. That is, no mid-value quotes. Both double and
+     * single quotes are supported.
+     *
+     *  - key="value"              OK
+     *  - key=abc "quote" def  NOT OK
+     *  - key=’value’              OK
+     *
+     * Finally, we support escaping the quote character, and the
+     * escape character itself:
+     *
+     *  - key="value \"quotes\""
+     *  - key="backslash: \\"
+     *
+     * ONLY the "current" quote character can be escaped:
+     *
+     *  key="value \'"   NOt OK (both backslash and single quote is kept)
+     */
+
+    if ((copy[0] == '"' && *end == '"') ||
+        (copy[0] == '\'' && *end == '\''))
+    {
+        const char quote = copy[0];
+        *end = '\0';
+
+        memmove(copy, copy + 1, end - copy);
+
+        /* Un-escape */
+        for (char *p = copy; *p != '\0'; p++) {
+            if (p[0] == '\\' && (p[1] == '\\' || p[1] == quote)) {
+                memmove(p, p + 1, end - p);
+            }
+        }
+    }
+
     free(*res);
-    *res = xstrdup(ctx->value);
+    *res = copy;
     return true;
 }
 
@@ -612,7 +652,7 @@ value_to_pt_or_px(struct context *ctx, struct pt_or_px *res)
         char *end = NULL;
 
         long value = strtol(s, &end, 10);
-        if (!(errno == 0 && end == s + len - 2)) {
+        if (!(len > 2 && errno == 0 && end == s + len - 2)) {
             LOG_CONTEXTUAL_ERR("invalid px value (must be in the form 12px)");
             return false;
         }
@@ -884,6 +924,31 @@ parse_section_main(struct context *ctx)
         config_font_list_destroy(&conf->fonts[idx]);
         conf->fonts[idx] = new_list;
         return true;
+    }
+
+    else if (strcmp(key, "font-size-adjustment") == 0) {
+        const size_t len = strlen(ctx->value);
+        if (len >= 1 && ctx->value[len - 1] == '%') {
+            errno = 0;
+            char *end = NULL;
+
+            float percent = strtof(ctx->value, &end);
+            if (!(len > 1 && errno == 0 && end == ctx->value + len - 1)) {
+                LOG_CONTEXTUAL_ERR(
+                    "invalid percent value (must be in the form 10.5%%)");
+                return false;
+            }
+
+            conf->font_size_adjustment.percent = percent / 100.;
+            conf->font_size_adjustment.pt_or_px.pt = 0;
+            conf->font_size_adjustment.pt_or_px.px = 0;
+            return true;
+        } else {
+            bool ret = value_to_pt_or_px(ctx, &conf->font_size_adjustment.pt_or_px);
+            if (ret)
+                conf->font_size_adjustment.percent = 0.;
+            return ret;
+        }
     }
 
     else if (strcmp(key, "line-height") == 0)
@@ -1413,6 +1478,9 @@ parse_section_csd(struct context *ctx)
 static void
 free_binding_aux(struct binding_aux *aux)
 {
+    if (!aux->master_copy)
+        return;
+
     switch (aux->type) {
     case BINDING_AUX_NONE: break;
     case BINDING_AUX_PIPE: free_argv(&aux->pipe); break;
@@ -2256,21 +2324,22 @@ parse_section_environment(struct context *ctx)
 {
     struct config *conf = ctx->conf;
     const char *key = ctx->key;
-    const char *value = ctx->value;
 
+    /* Check for pre-existing env variable */
     tll_foreach(conf->env_vars, it) {
-        if (strcmp(it->item.name, key) == 0) {
-            free(it->item.value);
-            it->item.value = xstrdup(value);
-            return true;
-        }
+        if (strcmp(it->item.name, key) == 0)
+            return value_to_str(ctx, &it->item.value);
     }
 
-    struct env_var var = {
-        .name = xstrdup(key),
-        .value = xstrdup(value),
-    };
-    tll_push_back(conf->env_vars, var);
+    /*
+     * No pre-existing variable - allocate a new one
+     */
+
+    char *value = NULL;
+    if (!value_to_str(ctx, &value))
+        return false;
+
+    tll_push_back(conf->env_vars, ((struct env_var){xstrdup(key), value}));
     return true;
 }
 
@@ -2847,6 +2916,7 @@ config_load(struct config *conf, const char *conf_path,
         },
         .startup_mode = STARTUP_WINDOWED,
         .fonts = {{0}},
+        .font_size_adjustment = {.percent = 0., .pt_or_px = {.pt = 0.5, .px = 0}},
         .line_height = {.pt = 0, .px = -1},
         .letter_spacing = {.pt = 0, .px = 0},
         .horizontal_letter_offset = {.pt = 0, .px = 0},
@@ -2938,7 +3008,7 @@ config_load(struct config *conf, const char *conf_path,
 #if defined(FOOT_GRAPHEME_CLUSTERING) && FOOT_GRAPHEME_CLUSTERING
             .grapheme_shaping = fcft_caps & FCFT_CAPABILITY_GRAPHEME_SHAPING,
 #endif
-            .grapheme_width_method = GRAPHEME_WIDTH_WCSWIDTH,
+            .grapheme_width_method = GRAPHEME_WIDTH_DOUBLE,
             .delayed_render_lower_ns = 500000,         /* 0.5ms */
             .delayed_render_upper_ns = 16666666 / 2,   /* half a frame period (60Hz) */
             .max_shm_pool_size = 512 * 1024 * 1024,
@@ -3322,19 +3392,47 @@ config_font_parse(const char *pattern, struct config_font *font)
     if (pat == NULL)
         return false;
 
+    /*
+     * First look for user specified {pixel}size option
+     * e.g. “font-name:size=12”
+     */
+
     double pt_size = -1.0;
-    FcPatternGetDouble(pat, FC_SIZE, 0, &pt_size);
-    FcPatternRemove(pat, FC_SIZE, 0);
+    FcResult have_pt_size = FcPatternGetDouble(pat, FC_SIZE, 0, &pt_size);
 
     int px_size = -1;
-    FcPatternGetInteger(pat, FC_PIXEL_SIZE, 0, &px_size);
-    FcPatternRemove(pat, FC_PIXEL_SIZE, 0);
+    FcResult have_px_size = FcPatternGetInteger(pat, FC_PIXEL_SIZE, 0, &px_size);
 
-    if (pt_size == -1. && px_size == -1)
-        pt_size = 8.0;
+    if (have_pt_size != FcResultMatch && have_px_size != FcResultMatch) {
+        /*
+         * Apply fontconfig config. Can’t do that until we’ve first
+         * checked for a user provided size, since we may end up with
+         * both “size” and “pixelsize” being set, and we don’t know
+         * which one takes priority.
+         */
+        FcPattern *pat_copy = FcPatternDuplicate(pat);
+        if (pat_copy == NULL ||
+            !FcConfigSubstitute(NULL, pat_copy, FcMatchPattern))
+        {
+            LOG_WARN("%s: failed to do config substitution", pattern);
+        } else {
+            have_pt_size = FcPatternGetDouble(pat_copy, FC_SIZE, 0, &pt_size);
+            have_px_size = FcPatternGetInteger(pat_copy, FC_PIXEL_SIZE, 0, &px_size);
+        }
+
+        FcPatternDestroy(pat_copy);
+
+        if (have_pt_size != FcResultMatch && have_px_size != FcResultMatch)
+            pt_size = 8.0;
+    }
+
+    FcPatternRemove(pat, FC_SIZE, 0);
+    FcPatternRemove(pat, FC_PIXEL_SIZE, 0);
 
     char *stripped_pattern = (char *)FcNameUnparse(pat);
     FcPatternDestroy(pat);
+
+    LOG_DBG("%s: pt-size=%.2f, px-size=%d", stripped_pattern, pt_size, px_size);
 
     *font = (struct config_font){
         .pattern = stripped_pattern,

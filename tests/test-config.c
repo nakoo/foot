@@ -467,6 +467,7 @@ test_section_main(void)
     test_boolean(&ctx, &parse_section_main, "locked-title", &conf.locked_title);
     test_boolean(&ctx, &parse_section_main, "notify-focus-inhibit", &conf.notify_focus_inhibit);
 
+    test_pt_or_px(&ctx, &parse_section_main, "font-size-adjustment", &conf.font_size_adjustment.pt_or_px);  /* TODO: test ‘N%’ values too */
     test_pt_or_px(&ctx, &parse_section_main, "line-height", &conf.line_height);
     test_pt_or_px(&ctx, &parse_section_main, "letter-spacing", &conf.letter_spacing);
     test_pt_or_px(&ctx, &parse_section_main, "horizontal-letter-offset", &conf.horizontal_letter_offset);
@@ -894,7 +895,7 @@ enum collision_test_mode {
     FAIL_DIFFERENT_ACTION,
     FAIL_DIFFERENT_ARGV,
     FAIL_MOUSE_OVERRIDE,
-    SUCCED_SAME_ACTION_AND_ARGV,
+    SUCCEED_SAME_ACTION_AND_ARGV,
 };
 
 static void
@@ -948,7 +949,7 @@ _test_binding_collisions(struct context *ctx,
         break;
 
     case FAIL_DIFFERENT_ARGV:
-    case SUCCED_SAME_ACTION_AND_ARGV:
+    case SUCCEED_SAME_ACTION_AND_ARGV:
         bindings.arr[0].aux.type = BINDING_AUX_PIPE;
         bindings.arr[0].aux.master_copy = true;
         bindings.arr[0].aux.pipe.args = xcalloc(
@@ -964,13 +965,13 @@ _test_binding_collisions(struct context *ctx,
         bindings.arr[1].aux.pipe.args[0] = xstrdup("/usr/bin/foobar");
         bindings.arr[1].aux.pipe.args[1] = xstrdup("hello");
 
-        if (test_mode == SUCCED_SAME_ACTION_AND_ARGV)
+        if (test_mode == SUCCEED_SAME_ACTION_AND_ARGV)
             bindings.arr[1].aux.pipe.args[2] = xstrdup("world");
         break;
     }
 
     bool expected_result =
-        test_mode == SUCCED_SAME_ACTION_AND_ARGV ? true : false;
+        test_mode == SUCCEED_SAME_ACTION_AND_ARGV ? true : false;
 
     if (resolve_key_binding_collisions(
             ctx->conf, ctx->section, map, &bindings, type) != expected_result)
@@ -1003,7 +1004,7 @@ test_binding_collisions(struct context *ctx,
 {
     _test_binding_collisions(ctx, max_action, map, type, FAIL_DIFFERENT_ACTION);
     _test_binding_collisions(ctx, max_action, map, type, FAIL_DIFFERENT_ARGV);
-    _test_binding_collisions(ctx, max_action, map, type, SUCCED_SAME_ACTION_AND_ARGV);
+    _test_binding_collisions(ctx, max_action, map, type, SUCCEED_SAME_ACTION_AND_ARGV);
 
     if (type == MOUSE_BINDING) {
         _test_binding_collisions(
@@ -1303,6 +1304,7 @@ test_section_tweak(void)
 int
 main(int argc, const char *const *argv)
 {
+    FcInit();
     log_init(LOG_COLORIZE_AUTO, false, 0, LOG_CLASS_ERROR);
     test_section_main();
     test_section_bell();
@@ -1324,5 +1326,6 @@ main(int argc, const char *const *argv)
     test_section_environment();
     test_section_tweak();
     log_deinit();
+    FcFini();
     return 0;
 }

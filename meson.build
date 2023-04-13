@@ -1,5 +1,5 @@
 project('foot', 'c',
-        version: '1.13.1',
+        version: '1.14.0',
         license: 'MIT',
         meson_version: '>=0.58.0',
         default_options: [
@@ -110,7 +110,7 @@ if utf8proc.found()
   add_project_arguments('-DFOOT_GRAPHEME_CLUSTERING=1', language: 'c')
 endif
 
-tllist = dependency('tllist', version: '>=1.0.4', fallback: 'tllist')
+tllist = dependency('tllist', version: '>=1.1.0', fallback: 'tllist')
 fcft = dependency('fcft', version: ['>=3.0.1', '<4.0.0'], fallback: 'fcft')
 
 wayland_protocols_datadir = wayland_protocols.get_variable('pkgdatadir')
@@ -331,6 +331,7 @@ endif
 
 subdir('completions')
 subdir('icons')
+subdir('utils')
 
 if (get_option('tests'))
   subdir('tests')

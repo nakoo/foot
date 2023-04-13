@@ -420,6 +420,12 @@ cursor_colors_for_cell(const struct terminal *term, const struct cell *cell,
     } else {
         *cursor_color = *fg;
         *text_color = *bg;
+
+        if (unlikely(text_color->alpha != 0xffff)) {
+            /* The *only* color that can have transparency is the
+             * default background color */
+            *text_color = color_hex_to_pixman(term->colors.bg);
+        }
     }
 }
 
@@ -639,17 +645,21 @@ render_cell(struct terminal *term, pixman_image_t *pix,
             }
         }
 
-
         if (single == NULL && grapheme == NULL) {
-            xassert(base != 0);
-            single = fcft_rasterize_char_utf32(font, base, term->font_subpixel);
-            if (single == NULL) {
+            if (unlikely(base >= CELL_SPACER)) {
                 glyph_count = 0;
                 cell_cols = 1;
             } else {
-                glyph_count = 1;
-                glyphs = &single;
-                cell_cols = single->cols;
+                xassert(base != 0);
+                single = fcft_rasterize_char_utf32(font, base, term->font_subpixel);
+                if (single == NULL) {
+                    glyph_count = 0;
+                    cell_cols = 1;
+                } else {
+                    glyph_count = 1;
+                    glyphs = &single;
+                    cell_cols = single->cols;
+                }
             }
         }
     }
@@ -919,14 +929,19 @@ static void
 grid_render_scroll(struct terminal *term, struct buffer *buf,
                    const struct damage *dmg)
 {
-    int height = (dmg->region.end - dmg->region.start - dmg->lines) * term->cell_height;
-
     LOG_DBG(
         "damage: SCROLL: %d-%d by %d lines",
         dmg->region.start, dmg->region.end, dmg->lines);
 
-    if (height <= 0)
+    const int region_size = dmg->region.end - dmg->region.start;
+
+    if (dmg->lines >= region_size) {
+        /* The entire scroll region will be scrolled out (i.e. replaced) */
         return;
+    }
+
+    const int height = (region_size - dmg->lines) * term->cell_height;
+    xassert(height > 0);
 
 #if TIME_SCROLL_DAMAGE
     struct timespec start_time;
@@ -1027,14 +1042,19 @@ static void
 grid_render_scroll_reverse(struct terminal *term, struct buffer *buf,
                            const struct damage *dmg)
 {
-    int height = (dmg->region.end - dmg->region.start - dmg->lines) * term->cell_height;
-
     LOG_DBG(
         "damage: SCROLL REVERSE: %d-%d by %d lines",
         dmg->region.start, dmg->region.end, dmg->lines);
 
-    if (height <= 0)
+    const int region_size = dmg->region.end - dmg->region.start;
+
+    if (dmg->lines >= region_size) {
+        /* The entire scroll region will be scrolled out (i.e. replaced) */
         return;
+    }
+
+    const int height = (region_size - dmg->lines) * term->cell_height;
+    xassert(height > 0);
 
 #if TIME_SCROLL_DAMAGE
     struct timespec start_time;
@@ -3663,13 +3683,67 @@ tiocswinsz(struct terminal *term)
     }
 }
 
+static void
+delayed_reflow_of_normal_grid(struct terminal *term)
+{
+    if (term->interactive_resizing.grid == NULL)
+        return;
+
+    xassert(term->interactive_resizing.new_rows > 0);
+
+    struct coord *const tracking_points[] = {
+        &term->selection.coords.start,
+        &term->selection.coords.end,
+    };
+
+    /* Reflow the original (since before the resize was started) grid,
+     * to the *current* dimensions */
+    grid_resize_and_reflow(
+        term->interactive_resizing.grid,
+        term->interactive_resizing.new_rows, term->normal.num_cols,
+        term->interactive_resizing.old_screen_rows, term->rows,
+        term->selection.coords.end.row >= 0 ? ALEN(tracking_points) : 0,
+        tracking_points);
+
+    /* Replace the current, truncated, “normal” grid with the
+     * correctly reflowed one */
+    grid_free(&term->normal);
+    term->normal = *term->interactive_resizing.grid;
+    free(term->interactive_resizing.grid);
+
+    term->hide_cursor = term->interactive_resizing.old_hide_cursor;
+
+    /* Reset */
+    term->interactive_resizing.grid = NULL;
+    term->interactive_resizing.old_screen_rows = 0;
+    term->interactive_resizing.new_rows = 0;
+    term->interactive_resizing.old_hide_cursor = false;
+
+    /* Invalidate render pointers */
+    shm_unref(term->render.last_buf);
+    term->render.last_buf = NULL;
+    term->render.last_cursor.row = NULL;
+
+    tll_free(term->normal.scroll_damage);
+    sixel_reflow_grid(term, &term->normal);
+
+    if (term->grid == &term->normal) {
+        term_damage_view(term);
+        render_refresh(term);
+    }
+
+    term_ptmx_resume(term);
+}
+
 static bool
 fdm_tiocswinsz(struct fdm *fdm, int fd, int events, void *data)
 {
     struct terminal *term = data;
 
-    if (events & EPOLLIN)
+    if (events & EPOLLIN) {
         tiocswinsz(term);
+        delayed_reflow_of_normal_grid(term);
+    }
 
     if (term->window->resize_timeout_fd >= 0) {
         fdm_del(fdm, term->window->resize_timeout_fd);
@@ -3686,6 +3760,7 @@ send_dimensions_to_client(struct terminal *term)
     if (!win->is_resizing || term->conf->resize_delay_ms == 0) {
         /* Send new dimensions to client immediately */
         tiocswinsz(term);
+        delayed_reflow_of_normal_grid(term);
 
         /* And make sure to reset and deallocate a lingering timer */
         if (win->resize_timeout_fd >= 0) {
@@ -3716,7 +3791,10 @@ send_dimensions_to_client(struct terminal *term)
         if (fd >= 0) {
             /* Reset timeout */
             const struct itimerspec timeout = {
-                .it_value = {.tv_sec = 0, .tv_nsec = delay_ms * 1000000},
+                .it_value = {
+                    .tv_sec = delay_ms / 1000,
+                    .tv_nsec = (delay_ms % 1000) * 1000000,
+                },
             };
 
             if (timerfd_settime(fd, 0, &timeout, NULL) < 0) {
@@ -3727,8 +3805,10 @@ send_dimensions_to_client(struct terminal *term)
                 successfully_scheduled = true;
         }
 
-        if (!successfully_scheduled)
+        if (!successfully_scheduled) {
             tiocswinsz(term);
+            delayed_reflow_of_normal_grid(term);
+        }
     }
 }
 
@@ -3815,9 +3895,9 @@ maybe_resize(struct terminal *term, int width, int height, bool force)
     const int min_cols = 2;
     const int min_rows = 1;
 
-    /* Minimum window size */
-    const int min_width = min_cols * term->cell_width;
-    const int min_height = min_rows * term->cell_height;
+    /* Minimum window size (must be divisible by the scaling factor)*/
+    const int min_width = (min_cols * term->cell_width + scale - 1) / scale * scale;
+    const int min_height = (min_rows * term->cell_height + scale - 1) / scale * scale;
 
     width = max(width, min_width);
     height = max(height, min_height);
@@ -3844,8 +3924,8 @@ maybe_resize(struct terminal *term, int width, int height, bool force)
     const uint32_t scrollback_lines = term->render.scrollback_lines;
 
     /* Screen rows/cols before resize */
-    const int old_cols = term->cols;
-    const int old_rows = term->rows;
+    int old_cols = term->cols;
+    int old_rows = term->rows;
 
     /* Screen rows/cols after resize */
     const int new_cols = (term->width - 2 * pad_x) / term->cell_width;
@@ -3881,7 +3961,84 @@ maybe_resize(struct terminal *term, int width, int height, bool force)
 
     if (new_cols == old_cols && new_rows == old_rows) {
         LOG_DBG("grid layout unaffected; skipping reflow");
+        term->interactive_resizing.new_rows = new_normal_grid_rows;
         goto damage_view;
+    }
+
+
+    /*
+     * Since text reflow is slow, don’t do it *while* resizing. Only
+     * do it when done, or after “pausing” the resize for sufficiently
+     * long. We re-use the TIOCSWINSZ timer to handle this. See
+     * send_dimensions_to_client() and fdm_tiocswinsz().
+     *
+     * To be able to do the final reflow correctly, we need a copy of
+     * the original grid, before the resize started.
+     */
+    if (term->window->is_resizing && term->conf->resize_delay_ms > 0) {
+        if (term->interactive_resizing.grid == NULL) {
+            term_ptmx_pause(term);
+
+            /* Stash the current ‘normal’ grid, as-is, to be used when
+             * doing the final reflow */
+            term->interactive_resizing.old_screen_rows = term->rows;
+            term->interactive_resizing.old_cols = term->cols;
+            term->interactive_resizing.old_hide_cursor = term->hide_cursor;
+            term->interactive_resizing.grid = xmalloc(sizeof(*term->interactive_resizing.grid));
+            *term->interactive_resizing.grid = term->normal;
+            term->interactive_resizing.selection_coords = term->selection.coords;
+        } else {
+            /* We’ll replace the current temporary grid, with a new
+             * one (again based on the original grid) */
+            grid_free(&term->normal);
+        }
+
+        struct grid *orig = term->interactive_resizing.grid;
+
+        /*
+         * Copy the current viewport (of the original grid) to a new
+         * grid that will be used during the resize. For now, throw
+         * away sixels and OSC-8 URLs. They’ll be "restored" when we
+         * do the final reflow.
+         *
+         * Note that OSC-8 URLs are perfectly ok to throw away; they
+         * cannot be interacted with during the resize. And, even if
+         * url.osc8-underline=always, the “underline” attribute is
+         * part of the cell, not the URI struct (and thus our faked
+         * grid will still render OSC-8 links underlined).
+         *
+         * TODO:
+         *  - sixels?
+         */
+        struct grid g = {
+            .num_rows = 1 << (32 - __builtin_clz(term->interactive_resizing.old_screen_rows)),
+            .num_cols = term->interactive_resizing.old_cols,
+            .offset = 0,
+            .view = 0,
+            .cursor = orig->cursor,
+            .saved_cursor = orig->saved_cursor,
+            .rows = xcalloc(g.num_rows, sizeof(g.rows[0])),
+            .cur_row = NULL,
+            .scroll_damage = tll_init(),
+            .sixel_images = tll_init(),
+            .kitty_kbd = orig->kitty_kbd,
+        };
+
+        term->selection.coords.start.row -= orig->view;
+        term->selection.coords.end.row -= orig->view;
+
+        for (size_t i = 0, j = orig->view;
+             i < term->interactive_resizing.old_screen_rows;
+             i++, j = (j + 1) & (orig->num_rows - 1))
+        {
+            g.rows[i] = grid_row_alloc(g.num_cols, false);
+            memcpy(g.rows[i]->cells,
+                   orig->rows[j]->cells,
+                   g.num_cols * sizeof(g.rows[i]->cells[0]));
+        }
+
+        term->normal = g;
+        term->hide_cursor = true;
     }
 
     if (term->grid == &term->alt)
@@ -3903,16 +4060,51 @@ maybe_resize(struct terminal *term, int width, int height, bool force)
      * selection’s pivot point coordinates *must* be added to the
      * tracking points list.
      */
-    struct coord *const tracking_points[] = {
-        &term->selection.coords.start,
-        &term->selection.coords.end,
-    };
-
     /* Resize grids */
-    grid_resize_and_reflow(
-        &term->normal, new_normal_grid_rows, new_cols, old_rows, new_rows,
-        term->selection.coords.end.row >= 0 ? ALEN(tracking_points) : 0,
-        tracking_points);
+    if (term->window->is_resizing && term->conf->resize_delay_ms > 0) {
+        /* Simple truncating resize, *while* an interactive resize is
+         * ongoing. */
+        xassert(term->interactive_resizing.grid != NULL);
+        xassert(new_normal_grid_rows > 0);
+        term->interactive_resizing.new_rows = new_normal_grid_rows;
+
+        grid_resize_without_reflow(
+            &term->normal, new_alt_grid_rows, new_cols,
+            term->interactive_resizing.old_screen_rows, new_rows);
+    } else {
+        /* Full text reflow */
+
+        if (term->interactive_resizing.grid != NULL) {
+            /* Throw away the current, truncated, “normal” grid, and
+             * use the original grid instead (from before the resize
+             * started) */
+            grid_free(&term->normal);
+            term->normal = *term->interactive_resizing.grid;
+            free(term->interactive_resizing.grid);
+
+            term->hide_cursor = term->interactive_resizing.old_hide_cursor;
+            term->selection.coords = term->interactive_resizing.selection_coords;
+
+            old_rows = term->interactive_resizing.old_screen_rows;
+
+            term->interactive_resizing.grid = NULL;
+            term->interactive_resizing.old_screen_rows = 0;
+            term->interactive_resizing.new_rows = 0;
+            term->interactive_resizing.old_hide_cursor = false;
+            term->interactive_resizing.selection_coords = (struct range){{-1, -1}, {-1, -1}};
+            term_ptmx_resume(term);
+        }
+
+        struct coord *const tracking_points[] = {
+            &term->selection.coords.start,
+            &term->selection.coords.end,
+        };
+
+        grid_resize_and_reflow(
+            &term->normal, new_normal_grid_rows, new_cols, old_rows, new_rows,
+            term->selection.coords.end.row >= 0 ? ALEN(tracking_points) : 0,
+            tracking_points);
+    }
 
     grid_resize_without_reflow(
         &term->alt, new_alt_grid_rows, new_cols, old_rows, new_rows);
@@ -3936,9 +4128,11 @@ maybe_resize(struct terminal *term, int width, int height, bool force)
 
     if (term->scroll_region.start >= term->rows)
         term->scroll_region.start = 0;
-
-    if (term->scroll_region.end >= old_rows)
+    if (term->scroll_region.end > term->rows ||
+        term->scroll_region.end >= old_rows)
+    {
         term->scroll_region.end = term->rows;
+    }
 
     term->render.last_cursor.row = NULL;
 
@@ -3956,12 +4150,6 @@ damage_view:
         term->stashed_height = term->height;
     }
 
-#if 0
-    /* TODO: doesn't include CSD title bar */
-    xdg_toplevel_set_min_size(
-        term->window->xdg_toplevel, min_width / scale, min_height / scale);
-#endif
-
     {
         const bool title_shown = wayl_win_csd_titlebar_visible(term->window);
         const bool border_shown = wayl_win_csd_borders_visible(term->window);
@@ -3970,6 +4158,11 @@ damage_view:
             title_shown ? term->conf->csd.title_height : 0;
         const int border_width =
             border_shown ? term->conf->csd.border_width_visible : 0;
+
+        xdg_toplevel_set_min_size(
+            term->window->xdg_toplevel,
+            min_width / scale + 2 * border_width,
+            min_height / scale + title_height + 2 * border_width);
 
         xdg_surface_set_window_geometry(
             term->window->xdg_surface,
