@@ -411,7 +411,7 @@ execute_binding(struct seat *seat, struct terminal *term,
 
             term_damage_view(term);
             render_refresh(term);
-            break; 
+            break;
         }
 
         return true;
@@ -2633,4 +2633,99 @@ const struct wl_pointer_listener pointer_listener = {
     .axis_source = wl_pointer_axis_source,
     .axis_stop = wl_pointer_axis_stop,
     .axis_discrete = wl_pointer_axis_discrete,
+};
+
+static void
+wl_touch_down(void *data, struct wl_touch *wl_touch, uint32_t serial,
+              uint32_t time, struct wl_surface *surface, int32_t id,
+              int32_t x, int32_t y)
+{
+    struct seat *seat = data;
+    if (seat->touch.id != 0) // Multi-touch is not supported
+        return;
+    seat->touch.id = id;
+
+    struct terminal *term = ((const struct wl_window *)wl_surface_get_user_data(surface))->term;
+    xassert(term != NULL);
+
+    seat->touch.serial = serial;
+    seat->touch.x = wl_fixed_to_int(x) * term->scale;
+    seat->touch.y = wl_fixed_to_int(y) * term->scale;
+    seat->touch.surface = surface;
+}
+
+static void
+wl_touch_up(void *data, struct wl_touch *wl_touch, uint32_t serial,
+              uint32_t time, int32_t id)
+{
+    struct seat *seat = data;
+    if (seat->touch.id != id) // Not our touch point.
+        return;
+
+    seat->touch.id = 0;
+}
+
+static void
+wl_touch_motion(void *data, struct wl_touch *wl_touch, uint32_t time,
+                int32_t id, wl_fixed_t x, wl_fixed_t y)
+{
+    struct seat *seat = data;
+    if (seat->touch.id != id) // Not our touch point.
+        return;
+
+    struct terminal *term = ((const struct wl_window *)wl_surface_get_user_data(seat->touch.surface))->term;
+    xassert(term != NULL);
+
+    int new_y = wl_fixed_to_int(y) * term->scale;
+
+    int32_t distance = (new_y - seat->touch.y);
+    int32_t lines = distance  / term->cell_height;
+    if (lines == 0) {
+        // Don't update the origin 'y'.
+        // This half-cell motion might compound with the next one.
+        return;
+    }
+    seat->touch.y = new_y;
+
+    if (lines > 0) {
+        cmd_scrollback_up(term, lines);
+    } else if (lines < 0) {
+        cmd_scrollback_down(term, -lines);
+    }
+}
+static void
+wl_touch_frame(void *data, struct wl_touch *wl_touch)
+{
+    // no-op
+}
+
+static void
+wl_touch_cancel(void *data, struct wl_touch *wl_touch)
+{
+    struct seat *seat = data;
+    seat->touch.id = 0;
+}
+
+static void
+wl_touch_shape(void *data, struct wl_touch *wl_touch,
+               int32_t id, int32_t major, int32_t minor)
+{
+    // no-op
+}
+
+static void
+wl_touch_orientation(void *data, struct wl_touch *wl_touch,
+                     int32_t id, int32_t orientation)
+{
+    // no-op
+}
+
+const struct wl_touch_listener touch_listener = {
+    .down = wl_touch_down,
+    .up = wl_touch_up,
+    .motion = wl_touch_motion,
+    .frame = wl_touch_frame,
+    .cancel = wl_touch_cancel,
+    .shape = wl_touch_shape,
+    .orientation = wl_touch_orientation,
 };

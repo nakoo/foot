@@ -157,6 +157,16 @@ struct seat {
         bool have_discrete;
     } mouse;
 
+    /* Pointer state */
+    struct wl_touch *wl_touch;
+    struct {
+        uint32_t serial; // Unused for now; usable later for copying.
+        int32_t id;
+        struct wl_surface *surface;
+        int32_t x;
+        int32_t y;
+    } touch;
+
     /* Clipboard */
     struct wl_data_device *data_device;
     struct zwp_primary_selection_device_v1 *primary_selection_device;
