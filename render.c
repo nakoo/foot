@@ -2096,8 +2096,8 @@ render_csd_button_minimize(struct terminal *term, struct buffer *buf)
     pixman_color_t color = get_csd_button_fg_color(term->conf);
     pixman_image_t *src = pixman_image_create_solid_fill(&color);
 
-    const int max_height = buf->height / 2;
-    const int max_width = buf->width / 2;
+    const int max_height = buf->height / 3;
+    const int max_width = buf->width / 3;
 
     int width = min(max_height, max_width);
     int thick = min(width / 2, 1 * term->scale);
