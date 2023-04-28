@@ -8,7 +8,7 @@ foreground=dedeef
 background=1a1a1a
 
 regular0=1a1a1a
-regular1=ef3a3a
+regular1=ff3a3a
 regular2=3aef3a
 regular3=e6e61a
 regular4=1a7eff
@@ -17,7 +17,7 @@ regular6=3ff0e0
 regular7=dadada
 
 bright0=5a5a5a
-bright1=f3aaaa
+bright1=ffaaaa
 bright2=aaf3aa
 bright3=f3f35a
 bright4=6abaff
