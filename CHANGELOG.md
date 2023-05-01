@@ -55,7 +55,6 @@
   encoded as `CSI R`, but this was removed from the specification
   since `CSI R` conflicts with the _”Cursor Position Report”_.
 
-
 ### Deprecated
 ### Removed
 ### Fixed
@@ -64,8 +63,12 @@
 * Crash when scrolling after resizing the window with non-zero
   scrolling regions.
 * `XTMODKEYS` state not being reset on a terminal reset.
+* In Gnome dock foot always groups under "foot client".
+  Change instances of footclient and foot to appear as "foot client"
+  and "foot" respectively. ([#1318][1318])
 
 [1317]: https://codeberg.org/dnkl/foot/issues/1317
+[1318]: https://codeberg.org/dnkl/foot/pulls/1334
 
 
 ### Security
