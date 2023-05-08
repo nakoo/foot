@@ -521,6 +521,9 @@ main(int argc, char *const *argv)
     if (conf_app_id != NULL) {
         free(conf.app_id);
         conf.app_id = xstrdup(conf_app_id);
+    } else if (as_server) {
+        free(conf.app_id);
+        conf.app_id = xstrdup("footclient");
     }
     if (login_shell)
         conf.login_shell = true;
@@ -672,6 +675,7 @@ main(int argc, char *const *argv)
     if (as_server)
         LOG_INFO("running as server; launch terminals by running footclient");
 
+    LOG_INFO("app-id %s", conf.app_id);
     if (as_server && pid_file != NULL) {
         if (!print_pid(pid_file, &unlink_pid_file))
             goto out;
