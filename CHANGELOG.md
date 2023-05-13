@@ -54,7 +54,9 @@
   `CSI R`. The kitty keyboard protocol originally allowed F3 to be
   encoded as `CSI R`, but this was removed from the specification
   since `CSI R` conflicts with the _”Cursor Position Report”_.
-
+* Changed the CSD shapes for the maxmize, return to window, minimize
+  and close buttons. This new decoration style aligns better with 
+  GNOME and looks better on the other compositors. 
 
 ### Deprecated
 ### Removed
