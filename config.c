@@ -2889,7 +2889,8 @@ config_font_list_clone(struct config_font_list *dst,
 bool
 config_load(struct config *conf, const char *conf_path,
             user_notifications_t *initial_user_notifications,
-            config_override_t *overrides, bool errors_are_fatal)
+            config_override_t *overrides, bool errors_are_fatal,
+            bool as_server)
 {
     bool ret = false;
     enum fcft_capabilities fcft_caps = fcft_capabilities();
@@ -2898,7 +2899,7 @@ config_load(struct config *conf, const char *conf_path,
         .term = xstrdup(FOOT_DEFAULT_TERM),
         .shell = get_shell(),
         .title = xstrdup("foot"),
-        .app_id = xstrdup("foot"),
+        .app_id = (as_server ? xstrdup("footclient") : xstrdup("foot")),
         .word_delimiters = xc32dup(U",│`|:\"'()[]{}<>"),
         .size = {
             .type = CONF_SIZE_PX,
@@ -3329,7 +3330,7 @@ UNITTEST
     user_notifications_t nots = tll_init();
     config_override_t overrides = tll_init();
 
-    bool ret = config_load(&original, "/dev/null", &nots, &overrides, false);
+    bool ret = config_load(&original, "/dev/null", &nots, &overrides, false, false);
     xassert(ret);
 
     struct config *clone = config_clone(&original);

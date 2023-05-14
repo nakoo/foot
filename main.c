@@ -487,7 +487,7 @@ main(int argc, char *const *argv)
 
     struct config conf = {NULL};
     bool conf_successful = config_load(
-        &conf, conf_path, &user_notifications, &overrides, check_config);
+        &conf, conf_path, &user_notifications, &overrides, check_config, as_server);
 
     tll_free(overrides);
     if (!conf_successful) {
@@ -521,9 +521,6 @@ main(int argc, char *const *argv)
     if (conf_app_id != NULL) {
         free(conf.app_id);
         conf.app_id = xstrdup(conf_app_id);
-    } else if (as_server) {
-        free(conf.app_id);
-        conf.app_id = xstrdup("footclient");
     }
     if (login_shell)
         conf.login_shell = true;
