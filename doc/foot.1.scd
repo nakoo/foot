@@ -65,7 +65,8 @@ the foot command line
 
 *-a*,*--app-id*=_ID_
 	Value to set the *app-id* property on the Wayland window
-	to. Default: _foot_.
+	to. Default: _foot_ when started normally and _footclient_ when
+	started via daemon mode.
 
 *-m*,*--maximized*
 	Start in maximized mode. If both *--maximized* and *--fullscreen*
