@@ -289,9 +289,8 @@ empty string to be set, but it must be quoted: *KEY=""*)
 *app-id*
 	Value to set the *app-id* property on the Wayland window to. The
 	compositor can use this value to e.g. group multiple windows, or
-	apply window management rules. Default: When starting in normal
-	mode the app-id will be _foot_. In daemon mode the value will be 
-	_footclient_.
+	apply window management rules. Default: _foot_ (normal mode), or
+	_footclient_ (server mode).
 
 *bold-text-in-bright*
 	Semi-boolean. When enabled, bold text is rendered in a brighter
