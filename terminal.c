@@ -3302,8 +3302,11 @@ term_bell(struct terminal *term)
 bool
 term_spawn_new(const struct terminal *term)
 {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "/proc/%d/cwd", term->slave);
+
     return spawn(
-        term->reaper, term->cwd, (char *const []){term->foot_exe, NULL},
+        term->reaper, realpath(buf, NULL), (char *const []){term->foot_exe, NULL},
         -1, -1, -1, NULL);
 }
 

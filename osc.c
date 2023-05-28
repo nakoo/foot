@@ -416,28 +416,6 @@ parse_rgb(const char *string, uint32_t *color, bool *_have_alpha,
 }
 
 static void
-osc_set_pwd(struct terminal *term, char *string)
-{
-    LOG_DBG("PWD: URI: %s", string);
-
-    char *scheme, *host, *path;
-    if (!uri_parse(string, strlen(string), &scheme, NULL, NULL, &host, NULL, &path, NULL, NULL)) {
-        LOG_ERR("OSC7: invalid URI: %s", string);
-        return;
-    }
-
-    if (strcmp(scheme, "file") == 0 && hostname_is_localhost(host)) {
-        LOG_DBG("OSC7: pwd: %s", path);
-        free(term->cwd);
-        term->cwd = path;
-    } else
-        free(path);
-
-    free(scheme);
-    free(host);
-}
-
-static void
 osc_uri(struct terminal *term, char *string)
 {
     /*
@@ -661,11 +639,6 @@ osc_dispatch(struct terminal *term)
 
         break;
     }
-
-    case 7:
-        /* Update terminal's understanding of PWD */
-        osc_set_pwd(term, string);
-        break;
 
     case 8:
         osc_uri(term, string);
