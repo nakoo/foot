@@ -1159,11 +1159,24 @@ parse_section_url(struct context *ctx)
                 conf->url.prot_count * sizeof(conf->url.protocols[0]));
 
             size_t idx = conf->url.prot_count - 1;
-            conf->url.protocols[idx] = xmalloc((chars + 1 + 3) * sizeof(char32_t));
-            mbsntoc32(conf->url.protocols[idx], prot, len, chars + 1);
-            c32cpy(&conf->url.protocols[idx][chars], U"://");
+            bool is_custom_prefix = str_has_prefix(prot, "prefix:");
+            size_t prot_suffix_len = 3; // the '://'
+            if (is_custom_prefix) {
+                prot += 7;
+                len -= 7;
+                chars -= 7;
+                prot_suffix_len = 0;
+            }
 
-            chars += 3;  /* Include the "://" */
+            conf->url.protocols[idx] = xmalloc((chars + 1 + prot_suffix_len) * sizeof(char32_t));
+            mbsntoc32(conf->url.protocols[idx], prot, len, chars + 1);
+            if (!is_custom_prefix) {
+                c32cpy(&conf->url.protocols[idx][chars], U"://");
+            } else {
+                c32cpy(&conf->url.protocols[idx][chars], U"");
+            }
+            chars += prot_suffix_len;
+
             if (chars > conf->url.max_prot_len)
                 conf->url.max_prot_len = chars;
         }
