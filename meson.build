@@ -161,14 +161,16 @@ if wayland_protocols.version().version_compare('>=1.21')
 else
   xdg_activation = false
 endif
-if wayland_protocols.version().version_compare('>=1.31')
-  add_project_arguments('-DHAVE_FRACTIONAL_SCALE', language: 'c')
-  wl_proto_xml += [wayland_protocols_datadir + '/stable/viewporter/viewporter.xml']
-  wl_proto_xml += [wayland_protocols_datadir + '/staging/fractional-scale/fractional-scale-v1.xml']
-  fractional_scale = true
+
+if get_option('fractional-scale') and wayland_protocols.version().version_compare('>=1.31')
+    add_project_arguments('-DHAVE_FRACTIONAL_SCALE', language: 'c')
+    wl_proto_xml += [wayland_protocols_datadir + '/stable/viewporter/viewporter.xml']
+    wl_proto_xml += [wayland_protocols_datadir + '/staging/fractional-scale/fractional-scale-v1.xml']
+    fractional_scale = false
 else
   fractional_scale = false
 endif
+
 if wayland_protocols.version().version_compare('>=1.32')
   wl_proto_xml += [
       wayland_protocols_datadir + '/unstable/tablet/tablet-unstable-v2.xml',  # required by cursor-shape-v1

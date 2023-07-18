@@ -155,6 +155,7 @@ Available compile-time options:
 | `-Dsystemd-units-dir`                | string  | `${systemduserunitdir}` | Where to install the systemd service files (absolute)                           | None                |
 | `-Dutmp-backend`                     | combo   | `auto`                  | Which utmp backend to use (`none`, `libutempter`, `ulog` or `auto`)             | libutempter or ulog |
 | `-Dutmp-default-helper-path`         | string  | `auto`                  | Default path to utmp helper binary. `auto` selects path based on `utmp-backend` | None                |
+| `-Dfractional-scale`                 | bool    | `true`                  | Enable fractional scale support (available after >=wayland-protocol-1.31)       | None                |
 
 Documentation includes the man pages, readme, changelog and license
 files.
