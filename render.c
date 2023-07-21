@@ -538,7 +538,7 @@ render_cell(struct terminal *term, pixman_image_t *pix, pixman_region32_t *damag
         }
 
         else if (cell->attrs.bg_src == COLOR_DEFAULT) {
-            if (term->window->is_fullscreen) {
+            if (term->window->is_fullscreen && !term->conf->tweak.transparent_fullscreen) {
                 /*
                  * Note: disable transparency when fullscreened.
                  *
@@ -2900,8 +2900,7 @@ grid_render(struct terminal *term)
     xassert(term->height > 0);
 
     struct buffer_chain *chain = term->render.chains.grid;
-    bool use_alpha = !term->window->is_fullscreen &&
-                     term->colors.alpha != 0xffff;
+    bool use_alpha = term->colors.alpha != 0xffff;
     struct buffer *buf = shm_get_buffer(
         chain, term->width, term->height, use_alpha);
 

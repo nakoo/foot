@@ -2569,6 +2569,9 @@ parse_section_tweak(struct context *ctx)
     else if (streq(key, "bold-text-in-bright-amount"))
         return value_to_float(ctx, &conf->bold_in_bright.amount);
 
+    else if (strcmp(key, "transparent_fullscreen") == 0)
+        return value_to_bool(ctx, &conf->tweak.transparent_fullscreen);
+
     else {
         LOG_CONTEXTUAL_ERR("not a valid option: %s", key);
         return false;
@@ -3158,6 +3161,7 @@ config_load(struct config *conf, const char *conf_path,
             .box_drawing_solid_shades = true,
             .font_monospace_warn = true,
             .sixel = true,
+            .transparent_fullscreen = false,
         },
 
         .touch = {

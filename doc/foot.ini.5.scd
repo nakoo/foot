@@ -1507,6 +1507,10 @@ any of these options.
 	*bold-text-in-bright* is set to *yes* (the *palette-based* variant
 	is not affected by this option). Default: _1.3_.
 
+*transparent_fullscreen*
+	Boolean. When enabled, foot will not disable the alpha channel when
+	in fullscreen state. Default: _no_
+
 # SEE ALSO
 
 *foot*(1), *footclient*(1)

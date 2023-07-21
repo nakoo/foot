@@ -368,6 +368,7 @@ struct config {
         bool box_drawing_solid_shades;
         bool font_monospace_warn;
         bool sixel;
+        bool transparent_fullscreen;
     } tweak;
 
     struct {
