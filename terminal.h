@@ -126,14 +126,48 @@ struct row {
 };
 
 struct sixel {
-    void *data;
+    /*
+     * These three members reflect the "current", maybe scaled version
+     * of the image.
+     *
+     * The values will either be NULL/-1/-1, or match either the
+     * values in "original", or "scaled".
+     *
+     * They are typically reset when we need to invalidate the cached
+     * version (e.g. when the cell dimensions change).
+     */
     pixman_image_t *pix;
     int width;
     int height;
+
     int rows;
     int cols;
     struct coord pos;
     bool opaque;
+
+    /*
+     * We store the cell dimensions of the time the sixel was emitted.
+     *
+     * If the font size is changed, we rescale the image accordingly,
+     * to ensure it stays within its cell boundaries. ‘scaled’ is a
+     * cached, rescaled version of ‘data’ + ‘pix’.
+     */
+    int cell_width;
+    int cell_height;
+
+    struct {
+        void *data;
+        pixman_image_t *pix;
+        int width;
+        int height;
+    } original;
+
+    struct {
+        void *data;
+        pixman_image_t *pix;
+        int width;
+        int height;
+    } scaled;
 };
 
 enum kitty_kbd_flags {
@@ -180,8 +214,10 @@ struct grid {
 };
 
 struct vt_subparams {
-    unsigned value[16];
     uint8_t idx;
+    unsigned *cur;
+    unsigned value[16];
+    unsigned dummy;
 };
 
 struct vt_param {
@@ -197,8 +233,10 @@ struct vt {
 #endif
     char32_t utf8;
     struct {
-        struct vt_param v[16];
         uint8_t idx;
+        struct vt_param *cur;
+        struct vt_param v[16];
+        struct vt_param dummy;
     } params;
 
     uint32_t private; /* LSB=priv0, MSB=priv3 */
@@ -450,7 +488,7 @@ struct terminal {
         int fd;
     } blink;
 
-    int scale;
+    float scale;
     int width;  /* pixels */
     int height; /* pixels */
     int stashed_width;
@@ -616,7 +654,6 @@ struct terminal {
         } state;
 
         struct coord pos;    /* Current sixel coordinate */
-        int max_non_empty_row_no;
         size_t row_byte_ofs; /* Byte position into image, for current row */
         int color_idx;       /* Current palette index */
         uint32_t *private_palette;   /* Private palette, used when private mode 1070 is enabled */
@@ -630,6 +667,15 @@ struct terminal {
             int height;      /* Image height, in pixels */
         } image;
 
+        /*
+         * Pan is the vertical shape of a pixel
+         * Pad is the horizontal shape of a pixel
+         *
+         * pan/pad is the sixel’s aspect ratio
+         */
+        int pan;
+        int pad;
+
         bool scrolling:1;                 /* Private mode 80 */
         bool use_private_palette:1;       /* Private mode 1070 */
         bool cursor_right_of_graphics:1;  /* Private mode 8452 */
@@ -637,6 +683,7 @@ struct terminal {
         unsigned params[5];  /* Collected parameters, for RASTER, COLOR_SPEC */
         unsigned param;      /* Currently collecting parameter, for RASTER, COLOR_SPEC and REPEAT */
         unsigned param_idx;  /* Parameters seen */
+        unsigned repeat_count;
 
         bool transparent_bg;
         uint32_t default_bg;
@@ -671,20 +718,6 @@ struct terminal {
     char *cwd;
 };
 
-extern const char *const XCURSOR_HIDDEN;
-extern const char *const XCURSOR_LEFT_PTR;
-extern const char *const XCURSOR_TEXT;
-extern const char *const XCURSOR_TEXT_FALLBACK;
-//extern const char *const XCURSOR_HAND2;
-extern const char *const XCURSOR_TOP_LEFT_CORNER;
-extern const char *const XCURSOR_TOP_RIGHT_CORNER;
-extern const char *const XCURSOR_BOTTOM_LEFT_CORNER;
-extern const char *const XCURSOR_BOTTOM_RIGHT_CORNER;
-extern const char *const XCURSOR_LEFT_SIDE;
-extern const char *const XCURSOR_RIGHT_SIDE;
-extern const char *const XCURSOR_TOP_SIDE;
-extern const char *const XCURSOR_BOTTOM_SIDE;
-
 struct config;
 struct terminal *term_init(
     const struct config *conf, struct fdm *fdm, struct reaper *reaper,
@@ -703,10 +736,11 @@ bool term_to_slave(struct terminal *term, const void *data, size_t len);
 bool term_paste_data_to_slave(
     struct terminal *term, const void *data, size_t len);
 
+bool term_update_scale(struct terminal *term);
 bool term_font_size_increase(struct terminal *term);
 bool term_font_size_decrease(struct terminal *term);
 bool term_font_size_reset(struct terminal *term);
-bool term_font_dpi_changed(struct terminal *term, int old_scale);
+bool term_font_dpi_changed(struct terminal *term, float old_scale);
 void term_font_subpixel_changed(struct terminal *term);
 
 int term_pt_or_px_as_pixels(
@@ -739,6 +773,7 @@ void term_erase_scrollback(struct terminal *term);
 int term_row_rel_to_abs(const struct terminal *term, int row);
 void term_cursor_home(struct terminal *term);
 void term_cursor_to(struct terminal *term, int row, int col);
+void term_cursor_col(struct terminal *term, int col);
 void term_cursor_left(struct terminal *term, int count);
 void term_cursor_right(struct terminal *term, int count);
 void term_cursor_up(struct terminal *term, int count);

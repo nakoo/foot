@@ -87,7 +87,7 @@ empty string to be set, but it must be quoted: *KEY=""*)
 	Examples:
 	```
 	font-size-adjustment=0.5   # Adjust by 0.5 points
-	font-size-adjustment=10xp  # Adjust by 10 pixels
+	font-size-adjustment=10px  # Adjust by 10 pixels
 	font-size-adjustment=7.5%  # Adjust by 7.5 percent
 	```
 	
@@ -185,7 +185,7 @@ empty string to be set, but it must be quoted: *KEY=""*)
 	Default: _no_.
 
 *dpi-aware*
-	*auto*, *yes*, or *no*.
+	Boolean.
 	
 	When set to *yes*, fonts are sized using the monitor's DPI, making
 	a font of a given size have the same physical size, regardless of
@@ -199,12 +199,6 @@ empty string to be set, but it must be quoted: *KEY=""*)
 	instead sized using the monitor's scaling factor; doubling the
 	scaling factor *does* double the font size.
 	
-	Finally, if set to *auto*, fonts will be sized using the monitor's
-	DPI if _all_ monitors have a scaling factor of 1. If at least one
-	monitor as a scaling factor larger than 1 (regardless of whether
-	the foot window is mapped on that monitor or not), fonts will be
-	scaled using the scaling factor.
-	
 	Note that this option typically does not work with bitmap fonts,
 	which only contains a pre-defined set of sizes, and cannot be
 	dynamically scaled. Whichever size (of the available ones) that
@@ -217,7 +211,7 @@ empty string to be set, but it must be quoted: *KEY=""*)
 	to size the font (*dpi-aware=no*), the font's pixel size will be
 	multiplied with the scaling factor.
 	
-	Default: _auto_
+	Default: _no_
 
 *pad*
 	Padding between border and glyphs, in pixels (subject to output
@@ -289,7 +283,8 @@ empty string to be set, but it must be quoted: *KEY=""*)
 *app-id*
 	Value to set the *app-id* property on the Wayland window to. The
 	compositor can use this value to e.g. group multiple windows, or
-	apply window management rules. Default: _foot_.
+	apply window management rules. Default: _foot_ (normal mode), or
+	_footclient_ (server mode).
 
 *bold-text-in-bright*
 	Semi-boolean. When enabled, bold text is rendered in a brighter
@@ -314,7 +309,8 @@ empty string to be set, but it must be quoted: *KEY=""*)
 	and _body_ (message content).
 	
 	_${app-id}_ is replaced with the value of the command line option
-	_--app-id_, and defaults to *foot*.
+	_--app-id_, and defaults to *foot* (normal mode), or
+	*footclient* (server mode).
 	
 	_${window-title}_ is replaced with the current window title.
 	
@@ -343,9 +339,24 @@ empty string to be set, but it must be quoted: *KEY=""*)
 	(including SMT). Note that this is not always the best value. In
 	some cases, the number of physical _cores_ is better.
 
-*utempter*
-	Path to utempter helper binary. Set to *none* to disable utmp
-	records. Default: _@utempter@_.
+*utmp-helper*
+	Path to utmp logging helper binary.
+	
+	When starting foot, an utmp record is created by launching the
+	helper binary with the following arguments:
+	
+	```
+	@utmp_add_args@
+	```
+	
+	When foot is closed, the utmp record is removed by launching the
+	helper binary with the following arguments:
+	
+	```
+	@utmp_del_args@
+	```
+	
+	Set to *none* to disable utmp records. Default: _@utmp_helper_path@_.
 
 # SECTION: environment
 
@@ -524,6 +535,14 @@ applications can change these at runtime.
 	
 	Default: _yes_.
 
+# SECTION: touch
+
+*long-press-delay*
+	Number of milliseconds to distinguish between a short press and
+	a long press on the touchscreen.
+
+	Default: _400_.
+
 # SECTION: colors
 
 This section controls the 16 ANSI colors, the default foreground and
@@ -544,15 +563,15 @@ can configure the background transparency with the _alpha_ option.
 
 *regular0*, *regular1* *..* *regular7*
 	The eight basic ANSI colors (Black, Red, Green, Yellow, Blue,
-	Magenta, Cyan, White). Default: _073642_, _dc322f_, _859900_,
-	_b58900_, _268bd2_, _d33682_, _2aa198_ and _eee8d5_ (a variant of
-	the _solarized dark_ theme).
+	Magenta, Cyan, White). Default: _242424_, _f62b5a_, _47b413_,
+	_e3c401_, _24acd4_, _f2affd_, _13c299_, _e6e6e6_ (starlight
+	theme, V4).
 
 *bright0*, *bright1* *..* *bright7*
 	The eight bright ANSI colors (Black, Red, Green, Yellow, Blue,
-	Magenta, Cyan, White). Default: _08404f_, _e35f5c_, _9fb700_,
-	_d9a400_, _4ba1de_, _dc619d_, _32c1b6_ and _ffffff_ (a variant of
-	the _solarized dark_ theme).
+	Magenta, Cyan, White). Default: _616161_, _ff4d51_, _35d450_,
+	_e9e836_, _5dc5f8_, _feabf2_, _24dfc4_, _ffffff_ (starlight
+	theme, V4).
 
 *dim0*, *dim1* *..* *dim7*
 	Custom colors to use with dimmed colors. Dimmed colors do not have
@@ -672,6 +691,10 @@ Examples:
 	Boolean. When enabled, the CSD titlebar is hidden when the window
 	is maximized. The completely disable the titlebar, set *size* to 0
 	instead. Default: _no_.
+
+*double-click-to-maximize*
+	Boolean. When enabled, double-clicking the CSD titlebar will
+	(un)maximize the window. Default: _yes_.
 
 *border-width*
 	Width of the border, in pixels (subject to output scaling). Note
@@ -815,7 +838,7 @@ e.g. *search-start=none*.
 *show-urls-launch*
 	Enter URL mode, where all currently visible URLs are tagged with a
 	jump label with a key sequence that will open the URL (and exit
-	URL mode). Default: _Control+Shift+u_.
+	URL mode). Default: _Control+Shift+o_.
 
 *show-urls-persistent*
 	Similar to *show-urls-launch*, but does not automatically exit URL
@@ -858,7 +881,7 @@ e.g. *search-start=none*.
 	fallback. The preferred way of entering Unicode characters, emojis
 	etc is by using an IME.
 	
-	Default: _none_.
+	Default: _Control+Shift+u_.
 
 # SECTION: search-bindings
 

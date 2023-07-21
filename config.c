@@ -30,8 +30,8 @@
 #include "xmalloc.h"
 #include "xsnprintf.h"
 
-static const uint32_t default_foreground = 0x839496;
-static const uint32_t default_background = 0x002b36;
+static const uint32_t default_foreground = 0xffffff;
+static const uint32_t default_background = 0x242424;
 
 static const size_t min_csd_border_width = 5;
 
@@ -48,23 +48,23 @@ static const size_t min_csd_border_width = 5;
 
 static const uint32_t default_color_table[256] = {
     // Regular
-    0x073642,
-    0xdc322f,
-    0x859900,
-    0xb58900,
-    0x268bd2,
-    0xd33682,
-    0x2aa198,
-    0xeee8d5,
+    0x242424,
+    0xf62b5a,
+    0x47b413,
+    0xe3c401,
+    0x24acd4,
+    0xf2affd,
+    0x13c299,
+    0xe6e6e6,
 
     // Bright
-    0x08404f,
-    0xe35f5c,
-    0x9fb700,
-    0xd9a400,
-    0x4ba1de,
-    0xdc619d,
-    0x32c1b6,
+    0x616161,
+    0xff4d51,
+    0x35d450,
+    0xe9e836,
+    0x5dc5f8,
+    0xfeabf2,
+    0x24dfc4,
     0xffffff,
 
     // 6x6x6 RGB cube
@@ -972,17 +972,8 @@ parse_section_main(struct context *ctx)
     else if (strcmp(key, "underline-thickness") == 0)
         return value_to_pt_or_px(ctx, &conf->underline_thickness);
 
-    else if (strcmp(key, "dpi-aware") == 0) {
-        if (strcmp(value, "auto") == 0)
-            conf->dpi_aware = DPI_AWARE_AUTO;
-        else {
-            bool value;
-            if (!value_to_bool(ctx, &value))
-                return false;
-            conf->dpi_aware = value ? DPI_AWARE_YES : DPI_AWARE_NO;
-        }
-        return true;
-    }
+    else if (strcmp(key, "dpi-aware") == 0)
+        return value_to_bool(ctx, &conf->dpi_aware);
 
     else if (strcmp(key, "workers") == 0)
         return value_to_uint16(ctx, 10, &conf->render_worker_count);
@@ -1009,13 +1000,29 @@ parse_section_main(struct context *ctx)
     else if (strcmp(key, "box-drawings-uses-font-glyphs") == 0)
         return value_to_bool(ctx, &conf->box_drawings_uses_font_glyphs);
 
-    else if (strcmp(key, "utempter") == 0) {
-        if (!value_to_str(ctx, &conf->utempter_path))
+    else if (strcmp(key, "utmp-helper") == 0 || strcmp(key, "utempter") == 0) {
+        if (strcmp(key, "utempter") == 0) {
+            struct user_notification deprecation = {
+                .kind = USER_NOTIFICATION_DEPRECATED,
+                .text = xasprintf(
+                    "%s:%d: \033[1m[main].utempter\033[22m, "
+                    "use \033[1m[main].utmp-helper\033[22m instead",
+                    ctx->path, ctx->lineno),
+            };
+            tll_push_back(conf->notifications, deprecation);
+
+            LOG_WARN(
+                "%s:%d: [main].utempter is deprecated, "
+                "use [main].utmp-helper instead",
+                ctx->path, ctx->lineno);
+        }
+
+        if (!value_to_str(ctx, &conf->utmp_helper_path))
             return false;
 
-        if (strcmp(conf->utempter_path, "none") == 0) {
-            free(conf->utempter_path);
-            conf->utempter_path = NULL;
+        if (strcmp(conf->utmp_helper_path, "none") == 0) {
+            free(conf->utmp_helper_path);
+            conf->utmp_helper_path = NULL;
         }
 
         return true;
@@ -1467,6 +1474,9 @@ parse_section_csd(struct context *ctx)
 
     else if (strcmp(key, "hide-when-maximized") == 0)
         return value_to_bool(ctx, &conf->csd.hide_when_maximized);
+
+    else if (strcmp(key, "double-click-to-maximize") == 0)
+        return value_to_bool(ctx, &conf->csd.double_click_to_maximize);
 
     else {
         LOG_CONTEXTUAL_ERR("not a valid action: %s", key);
@@ -2469,6 +2479,20 @@ parse_section_tweak(struct context *ctx)
 }
 
 static bool
+parse_section_touch(struct context *ctx) {
+    struct config *conf = ctx->conf;
+    const char *key = ctx->key;
+
+    if (strcmp(key, "long-press-delay") == 0)
+        return value_to_uint32(ctx, 10, &conf->touch.long_press_delay);
+
+    else {
+        LOG_CONTEXTUAL_ERR("not a valid option: %s", key);
+        return false;
+    }
+}
+
+static bool
 parse_key_value(char *kv, const char **section, const char **key, const char **value)
 {
     bool section_is_needed = section != NULL;
@@ -2547,6 +2571,7 @@ enum section {
     SECTION_TEXT_BINDINGS,
     SECTION_ENVIRONMENT,
     SECTION_TWEAK,
+    SECTION_TOUCH,
     SECTION_COUNT,
 };
 
@@ -2572,6 +2597,7 @@ static const struct {
     [SECTION_TEXT_BINDINGS] =   {&parse_section_text_bindings, "text-bindings"},
     [SECTION_ENVIRONMENT] =     {&parse_section_environment, "environment"},
     [SECTION_TWEAK] =           {&parse_section_tweak, "tweak"},
+    [SECTION_TOUCH] =           {&parse_section_touch, "touch"},
 };
 
 static_assert(ALEN(section_info) == SECTION_COUNT, "section info array size mismatch");
@@ -2784,7 +2810,8 @@ add_default_key_bindings(struct config *conf)
         {BIND_ACTION_FONT_SIZE_RESET, m_ctrl, {{XKB_KEY_0}}},
         {BIND_ACTION_FONT_SIZE_RESET, m_ctrl, {{XKB_KEY_KP_0}}},
         {BIND_ACTION_SPAWN_TERMINAL, m_ctrl_shift, {{XKB_KEY_n}}},
-        {BIND_ACTION_SHOW_URLS_LAUNCH, m_ctrl_shift, {{XKB_KEY_u}}},
+        {BIND_ACTION_SHOW_URLS_LAUNCH, m_ctrl_shift, {{XKB_KEY_o}}},
+        {BIND_ACTION_UNICODE_INPUT, m_ctrl_shift, {{XKB_KEY_u}}},
         {BIND_ACTION_PROMPT_PREV, m_ctrl_shift, {{XKB_KEY_z}}},
         {BIND_ACTION_PROMPT_NEXT, m_ctrl_shift, {{XKB_KEY_x}}},
     };
@@ -2889,7 +2916,8 @@ config_font_list_clone(struct config_font_list *dst,
 bool
 config_load(struct config *conf, const char *conf_path,
             user_notifications_t *initial_user_notifications,
-            config_override_t *overrides, bool errors_are_fatal)
+            config_override_t *overrides, bool errors_are_fatal,
+            bool as_server)
 {
     bool ret = false;
     enum fcft_capabilities fcft_caps = fcft_capabilities();
@@ -2898,7 +2926,7 @@ config_load(struct config *conf, const char *conf_path,
         .term = xstrdup(FOOT_DEFAULT_TERM),
         .shell = get_shell(),
         .title = xstrdup("foot"),
-        .app_id = xstrdup("foot"),
+        .app_id = (as_server ? xstrdup("footclient") : xstrdup("foot")),
         .word_delimiters = xc32dup(U",│`|:\"'()[]{}<>"),
         .size = {
             .type = CONF_SIZE_PX,
@@ -2922,7 +2950,7 @@ config_load(struct config *conf, const char *conf_path,
         .use_custom_underline_offset = false,
         .box_drawings_uses_font_glyphs = false,
         .underline_thickness = {.pt = 0., .px = -1},
-        .dpi_aware = DPI_AWARE_AUTO, /* DPI-aware when scaling-factor == 1 */
+        .dpi_aware = false,
         .bell = {
             .urgent = false,
             .notify = false,
@@ -2984,6 +3012,7 @@ config_load(struct config *conf, const char *conf_path,
             .preferred = CONF_CSD_PREFER_SERVER,
             .font = {0},
             .hide_when_maximized = false,
+            .double_click_to_maximize = true,
             .title_height = 26,
             .border_width = 5,
             .border_width_visible = 0,
@@ -3018,10 +3047,17 @@ config_load(struct config *conf, const char *conf_path,
             .sixel = true,
         },
 
+        .touch = {
+            .long_press_delay = 400,
+        },
+
         .env_vars = tll_init(),
-        .utempter_path = (strlen(FOOT_DEFAULT_UTEMPTER_PATH) > 0
-                          ? xstrdup(FOOT_DEFAULT_UTEMPTER_PATH)
-                          : NULL),
+#if defined(UTMP_DEFAULT_HELPER_PATH)
+        .utmp_helper_path = ((strlen(UTMP_DEFAULT_HELPER_PATH) > 0 &&
+                              access(UTMP_DEFAULT_HELPER_PATH, X_OK) == 0)
+                             ? xstrdup(UTMP_DEFAULT_HELPER_PATH)
+                             : NULL),
+#endif
         .notifications = tll_init(),
     };
 
@@ -3310,8 +3346,8 @@ config_clone(const struct config *old)
         tll_push_back(conf->env_vars, copy);
     }
 
-    conf->utempter_path =
-        old->utempter_path != NULL ? xstrdup(old->utempter_path) : NULL;
+    conf->utmp_helper_path =
+        old->utmp_helper_path != NULL ? xstrdup(old->utmp_helper_path) : NULL;
 
     conf->notifications.length = 0;
     conf->notifications.head = conf->notifications.tail = 0;
@@ -3329,7 +3365,9 @@ UNITTEST
     user_notifications_t nots = tll_init();
     config_override_t overrides = tll_init();
 
-    bool ret = config_load(&original, "/dev/null", &nots, &overrides, false);
+    fcft_init(FCFT_LOG_COLORIZE_NEVER, false, FCFT_LOG_CLASS_NONE);
+
+    bool ret = config_load(&original, "/dev/null", &nots, &overrides, false, false);
     xassert(ret);
 
     struct config *clone = config_clone(&original);
@@ -3339,6 +3377,8 @@ UNITTEST
     config_free(&original);
     config_free(clone);
     free(clone);
+
+    fcft_fini();
 
     tll_free(overrides);
     tll_free(nots);
@@ -3379,7 +3419,7 @@ config_free(struct config *conf)
         tll_remove(conf->env_vars, it);
     }
 
-    free(conf->utempter_path);
+    free(conf->utmp_helper_path);
     user_notifications_free(&conf->notifications);
 }
 

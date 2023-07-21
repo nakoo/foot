@@ -1704,21 +1704,51 @@ is_bottom_right(const struct terminal *term, int x, int y)
          (term->active_surface == TERM_SURF_BORDER_BOTTOM && x > term->width + 1 * csd_border_size * term->scale - 10 * term->scale)));
 }
 
-const char *
+enum cursor_shape
 xcursor_for_csd_border(struct terminal *term, int x, int y)
 {
-    if (is_top_left(term, x, y))                              return XCURSOR_TOP_LEFT_CORNER;
-    else if (is_top_right(term, x, y))                        return XCURSOR_TOP_RIGHT_CORNER;
-    else if (is_bottom_left(term, x, y))                      return XCURSOR_BOTTOM_LEFT_CORNER;
-    else if (is_bottom_right(term, x, y))                     return XCURSOR_BOTTOM_RIGHT_CORNER;
-    else if (term->active_surface == TERM_SURF_BORDER_LEFT)   return XCURSOR_LEFT_SIDE;
-    else if (term->active_surface == TERM_SURF_BORDER_RIGHT)  return XCURSOR_RIGHT_SIDE;
-    else if (term->active_surface == TERM_SURF_BORDER_TOP)    return XCURSOR_TOP_SIDE;
-    else if (term->active_surface == TERM_SURF_BORDER_BOTTOM) return XCURSOR_BOTTOM_SIDE;
+    if (is_top_left(term, x, y))                              return CURSOR_SHAPE_TOP_LEFT_CORNER;
+    else if (is_top_right(term, x, y))                        return CURSOR_SHAPE_TOP_RIGHT_CORNER;
+    else if (is_bottom_left(term, x, y))                      return CURSOR_SHAPE_BOTTOM_LEFT_CORNER;
+    else if (is_bottom_right(term, x, y))                     return CURSOR_SHAPE_BOTTOM_RIGHT_CORNER;
+    else if (term->active_surface == TERM_SURF_BORDER_LEFT)   return CURSOR_SHAPE_LEFT_SIDE;
+    else if (term->active_surface == TERM_SURF_BORDER_RIGHT)  return CURSOR_SHAPE_RIGHT_SIDE;
+    else if (term->active_surface == TERM_SURF_BORDER_TOP)    return CURSOR_SHAPE_TOP_SIDE;
+    else if (term->active_surface == TERM_SURF_BORDER_BOTTOM) return CURSOR_SHAPE_BOTTOM_SIDE;
     else {
         BUG("Unreachable");
-        return NULL;
+        return CURSOR_SHAPE_NONE;
     }
+}
+
+static void
+mouse_button_state_reset(struct seat *seat)
+{
+    tll_free(seat->mouse.buttons);
+    seat->mouse.count = 0;
+    seat->mouse.last_released_button = 0;
+    memset(&seat->mouse.last_time, 0, sizeof(seat->mouse.last_time));
+}
+
+static void
+mouse_coord_pixel_to_cell(struct seat *seat, const struct terminal *term,
+                          int x, int y)
+{
+    /*
+     * Translate x,y pixel coordinate to a cell coordinate, or -1
+     * if the cursor is outside the grid. I.e. if it is inside the
+     * margins.
+     */
+
+    if (x < term->margins.left || x >= term->width - term->margins.right)
+        seat->mouse.col = -1;
+    else
+        seat->mouse.col = (x - term->margins.left) / term->cell_width;
+
+    if (y < term->margins.top || y >= term->height - term->margins.bottom)
+        seat->mouse.row = -1;
+    else
+        seat->mouse.row = (y - term->margins.top) / term->cell_height;
 }
 
 static void
@@ -1733,6 +1763,24 @@ wl_pointer_enter(void *data, struct wl_pointer *wl_pointer,
     }
 
     struct seat *seat = data;
+
+    if (seat->wl_touch != NULL) {
+        switch (seat->touch.state) {
+        case TOUCH_STATE_IDLE:
+            mouse_button_state_reset(seat);
+            seat->touch.state = TOUCH_STATE_INHIBITED;
+            break;
+
+        case TOUCH_STATE_INHIBITED:
+            break;
+
+        case TOUCH_STATE_HELD:
+        case TOUCH_STATE_DRAGGING:
+        case TOUCH_STATE_SCROLLING:
+            return;
+        }
+    }
+
     struct wl_window *win = wl_surface_get_user_data(surface);
     struct terminal *term = win->term;
 
@@ -1759,22 +1807,7 @@ wl_pointer_enter(void *data, struct wl_pointer *wl_pointer,
 
     switch (term->active_surface) {
     case TERM_SURF_GRID: {
-        /*
-         * Translate x,y pixel coordinate to a cell coordinate, or -1
-         * if the cursor is outside the grid. I.e. if it is inside the
-         * margins.
-         */
-
-        if (x < term->margins.left || x >= term->width - term->margins.right)
-            seat->mouse.col = -1;
-        else
-            seat->mouse.col = (x - term->margins.left) / term->cell_width;
-
-        if (y < term->margins.top || y >= term->height - term->margins.bottom)
-            seat->mouse.row = -1;
-        else
-            seat->mouse.row = (y - term->margins.top) / term->cell_height;
-
+        mouse_coord_pixel_to_cell(seat, term, x, y);
         break;
     }
 
@@ -1802,6 +1835,14 @@ wl_pointer_leave(void *data, struct wl_pointer *wl_pointer,
                  uint32_t serial, struct wl_surface *surface)
 {
     struct seat *seat = data;
+
+    if (seat->wl_touch != NULL) {
+        if (seat->touch.state != TOUCH_STATE_INHIBITED) {
+            return;
+        }
+        seat->touch.state = TOUCH_STATE_IDLE;
+    }
+
     struct terminal *old_moused = seat->mouse_focus;
 
     LOG_DBG(
@@ -1819,15 +1860,12 @@ wl_pointer_leave(void *data, struct wl_pointer *wl_pointer,
     }
 
     /* Reset last-set-xcursor, to ensure we update it on a pointer-enter event */
-    seat->pointer.xcursor = NULL;
+    seat->pointer.shape = CURSOR_SHAPE_NONE;
 
     /* Reset mouse state */
     seat->mouse.x = seat->mouse.y = 0;
     seat->mouse.col = seat->mouse.row = 0;
-    tll_free(seat->mouse.buttons);
-    seat->mouse.count = 0;
-    seat->mouse.last_released_button = 0;
-    memset(&seat->mouse.last_time, 0, sizeof(seat->mouse.last_time));
+    mouse_button_state_reset(seat);
     for (size_t i = 0; i < ALEN(seat->mouse.aggregated); i++)
         seat->mouse.aggregated[i] = 0.0;
     seat->mouse.have_discrete = false;
@@ -1879,6 +1917,11 @@ wl_pointer_motion(void *data, struct wl_pointer *wl_pointer,
                   uint32_t time, wl_fixed_t surface_x, wl_fixed_t surface_y)
 {
     struct seat *seat = data;
+
+    /* Touch-emulated pointer events have wl_pointer == NULL. */
+    if (wl_pointer != NULL && seat->touch.state != TOUCH_STATE_INHIBITED)
+        return;
+
     struct wayland *wayl = seat->wayl;
     struct terminal *term = seat->mouse_focus;
 
@@ -2102,6 +2145,11 @@ wl_pointer_button(void *data, struct wl_pointer *wl_pointer,
     xassert(serial != 0);
 
     struct seat *seat = data;
+
+    /* Touch-emulated pointer events have wl_pointer == NULL. */
+    if (wl_pointer != NULL && seat->touch.state != TOUCH_STATE_INHIBITED)
+        return;
+
     struct wayland *wayl = seat->wayl;
     struct terminal *term = seat->mouse_focus;
 
@@ -2239,7 +2287,10 @@ wl_pointer_button(void *data, struct wl_pointer *wl_pointer,
             struct wl_window *win = term->window;
 
             /* Toggle maximized state on double-click */
-            if (button == BTN_LEFT && seat->mouse.count == 2) {
+            if (term->conf->csd.double_click_to_maximize &&
+                button == BTN_LEFT &&
+                seat->mouse.count == 2)
+            {
                 if (win->is_maximized)
                     xdg_toplevel_unset_maximized(win->xdg_toplevel);
                 else
@@ -2559,6 +2610,9 @@ wl_pointer_axis(void *data, struct wl_pointer *wl_pointer,
 {
     struct seat *seat = data;
 
+    if (seat->touch.state != TOUCH_STATE_INHIBITED)
+        return;
+
     if (seat->mouse.have_discrete)
         return;
 
@@ -2588,6 +2642,10 @@ wl_pointer_axis_discrete(void *data, struct wl_pointer *wl_pointer,
                          uint32_t axis, int32_t discrete)
 {
     struct seat *seat = data;
+
+    if (seat->touch.state != TOUCH_STATE_INHIBITED)
+        return;
+
     seat->mouse.have_discrete = true;
 
     int amount = discrete;
@@ -2604,6 +2662,10 @@ static void
 wl_pointer_frame(void *data, struct wl_pointer *wl_pointer)
 {
     struct seat *seat = data;
+
+    if (seat->touch.state != TOUCH_STATE_INHIBITED)
+        return;
+
     seat->mouse.have_discrete = false;
 }
 
@@ -2619,6 +2681,9 @@ wl_pointer_axis_stop(void *data, struct wl_pointer *wl_pointer,
 {
     struct seat *seat = data;
 
+    if (seat->touch.state != TOUCH_STATE_INHIBITED)
+        return;
+
     xassert(axis < ALEN(seat->mouse.aggregated));
     seat->mouse.aggregated[axis] = 0.;
 }
@@ -2633,4 +2698,167 @@ const struct wl_pointer_listener pointer_listener = {
     .axis_source = wl_pointer_axis_source,
     .axis_stop = wl_pointer_axis_stop,
     .axis_discrete = wl_pointer_axis_discrete,
+};
+
+static bool
+touch_to_scroll(struct seat *seat, struct terminal *term,
+                wl_fixed_t surface_x, wl_fixed_t surface_y)
+{
+    bool coord_updated = false;
+
+    int y = wl_fixed_to_int(surface_y) * term->scale;
+    int rows = (y - seat->mouse.y) / term->cell_height;
+    if (rows != 0) {
+        mouse_scroll(seat, -rows, WL_POINTER_AXIS_VERTICAL_SCROLL);
+        seat->mouse.y += rows * term->cell_height;
+        coord_updated = true;
+    }
+
+    int x = wl_fixed_to_int(surface_x) * term->scale;
+    int cols = (x - seat->mouse.x) / term->cell_width;
+    if (cols != 0) {
+        mouse_scroll(seat, -cols, WL_POINTER_AXIS_HORIZONTAL_SCROLL);
+        seat->mouse.x += cols * term->cell_width;
+        coord_updated = true;
+    }
+
+    return coord_updated;
+}
+
+static void
+wl_touch_down(void *data, struct wl_touch *wl_touch, uint32_t serial,
+              uint32_t time, struct wl_surface *surface, int32_t id,
+              wl_fixed_t surface_x, wl_fixed_t surface_y)
+{
+    struct seat *seat = data;
+
+    if (seat->touch.state != TOUCH_STATE_IDLE)
+        return;
+
+    struct wl_window *win = wl_surface_get_user_data(surface);
+    struct terminal *term = win->term;
+
+    term->active_surface = term_surface_kind(term, surface);
+
+    LOG_DBG("touch_down: touch=%p, x=%d, y=%d", (void *)wl_touch,
+            wl_fixed_to_int(surface_x), wl_fixed_to_int(surface_y));
+
+    int x = wl_fixed_to_int(surface_x) * term->scale;
+    int y = wl_fixed_to_int(surface_y) * term->scale;
+
+    seat->mouse.x = x;
+    seat->mouse.y = y;
+    mouse_coord_pixel_to_cell(seat, term, x, y);
+
+    seat->touch.state = TOUCH_STATE_HELD;
+    seat->touch.serial = serial;
+    seat->touch.time = time + term->conf->touch.long_press_delay;
+    seat->touch.surface = surface;
+    seat->touch.id = id;
+}
+
+static void
+wl_touch_up(void *data, struct wl_touch *wl_touch, uint32_t serial,
+            uint32_t time, int32_t id)
+{
+    struct seat *seat = data;
+
+    if (seat->touch.state <= TOUCH_STATE_IDLE || id != seat->touch.id)
+        return;
+
+    LOG_DBG("touch_up: touch=%p", (void *)wl_touch);
+
+    struct wl_window *win = wl_surface_get_user_data(seat->touch.surface);
+    struct terminal *term = win->term;
+
+    seat->mouse_focus = term;
+
+    switch (seat->touch.state) {
+    case TOUCH_STATE_HELD:
+        wl_pointer_button(seat, NULL, seat->touch.serial, time, BTN_LEFT,
+                          WL_POINTER_BUTTON_STATE_PRESSED);
+        /* fallthrough */
+    case TOUCH_STATE_DRAGGING:
+        wl_pointer_button(seat, NULL, serial, time, BTN_LEFT,
+                          WL_POINTER_BUTTON_STATE_RELEASED);
+        /* fallthrough */
+    case TOUCH_STATE_SCROLLING:
+        term->active_surface = TERM_SURF_NONE;
+        seat->touch.state = TOUCH_STATE_IDLE;
+        break;
+
+    case TOUCH_STATE_INHIBITED:
+    case TOUCH_STATE_IDLE:
+        BUG("Bad touch state: %d", seat->touch.state);
+        break;
+    }
+
+    seat->mouse_focus = NULL;
+}
+
+static void
+wl_touch_motion(void *data, struct wl_touch *wl_touch, uint32_t time,
+                int32_t id, wl_fixed_t surface_x, wl_fixed_t surface_y)
+{
+    struct seat *seat = data;
+    if (seat->touch.state <= TOUCH_STATE_IDLE || id != seat->touch.id)
+        return;
+
+    LOG_DBG("touch_motion: touch=%p, x=%d, y=%d", (void *)wl_touch,
+            wl_fixed_to_int(surface_x), wl_fixed_to_int(surface_y));
+
+    struct wl_window *win = wl_surface_get_user_data(seat->touch.surface);
+    struct terminal *term = win->term;
+
+    seat->mouse_focus = term;
+
+    switch (seat->touch.state) {
+    case TOUCH_STATE_HELD:
+        if (time <= seat->touch.time && term->active_surface == TERM_SURF_GRID) {
+            if (touch_to_scroll(seat, term, surface_x, surface_y))
+                seat->touch.state = TOUCH_STATE_SCROLLING;
+            break;
+        } else {
+            wl_pointer_button(seat, NULL, seat->touch.serial, time, BTN_LEFT,
+                              WL_POINTER_BUTTON_STATE_PRESSED);
+            seat->touch.state = TOUCH_STATE_DRAGGING;
+            /* fallthrough */
+        }
+    case TOUCH_STATE_DRAGGING:
+        wl_pointer_motion(seat, NULL, time, surface_x, surface_y);
+        break;
+    case TOUCH_STATE_SCROLLING:
+        touch_to_scroll(seat, term, surface_x, surface_y);
+        break;
+
+    case TOUCH_STATE_INHIBITED:
+    case TOUCH_STATE_IDLE:
+        BUG("Bad touch state: %d", seat->touch.state);
+        break;
+    }
+
+    seat->mouse_focus = NULL;
+}
+
+static void
+wl_touch_frame(void *data, struct wl_touch *wl_touch)
+{
+}
+
+static void
+wl_touch_cancel(void *data, struct wl_touch *wl_touch)
+{
+    struct seat *seat = data;
+    if (seat->touch.state == TOUCH_STATE_INHIBITED)
+        return;
+
+    seat->touch.state = TOUCH_STATE_IDLE;
+}
+
+const struct wl_touch_listener touch_listener = {
+    .down = wl_touch_down,
+    .up = wl_touch_up,
+    .motion = wl_touch_motion,
+    .frame = wl_touch_frame,
+    .cancel = wl_touch_cancel,
 };

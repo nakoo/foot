@@ -1,6 +1,7 @@
 # Changelog
 
 * [Unreleased](#unreleased)
+* [1.15.0](#1-15-0)
 * [1.14.0](#1-14-0)
 * [1.13.1](#1-13-1)
 * [1.13.0](#1-13-0)
@@ -44,16 +45,14 @@
 
 ## Unreleased
 ### Added
-
-* VT: implemented `XTQMODKEYS` query (`CSI ? Pp m`).
-
-
 ### Changed
 
-* Kitty keyboard protocol: F3 is now encoded as `CSI 13~` instead of
-  `CSI R`. The kitty keyboard protocol originally allowed F3 to be
-  encoded as `CSI R`, but this was removed from the specification
-  since `CSI R` conflicts with the _”Cursor Position Report”_.
+* When window is mapped, use metadata (DPI, scaling factor, subpixel
+  configuration) from the monitor we were most recently mapped on,
+  instead of the one least recently.
+* Starlight theme (the default theme) updated to [V4][starlight-v4]
+* Background transparency (alpha) is now disabled in fullscreened
+  windows ([#1416][1416]).
 * Foot server systemd units now use the standard
   graphical-session.target ([#1281][1281]).
 * If `$XDG_RUNTIME_DIR/foot-$WAYLAND_DISPLAY.sock` does not exist,
@@ -61,6 +60,8 @@
   `/tmp/foot.sock`, even if `$WAYLAND_DISPLAY` and/or
   `$XDG_RUNTIME_DIR` are defined ([#1281][1281]).
 
+[starlight-v4]: https://github.com/CosmicToast/starlight/blob/v4/CHANGELOG.md#v4
+[1416]: https://codeberg.org/dnkl/foot/issues/1416
 [1281]: https://codeberg.org/dnkl/foot/pulls/1281
 
 
@@ -68,15 +69,152 @@
 ### Removed
 ### Fixed
 
-* Incorrect icon in dock and window switcher on Gnome ([#1317][1317])
-* Crash when scrolling after resizing the window with non-zero
-  scrolling regions.
+* Use appropriate rounding when applying fractional scales.
+* Xcursor not being scaled correctly on `fractional-scale-v1` capable
+  compositors.
+* `dpi-aware=yes` being broken on `fractional-scale-v1` capable
+  compositors (and when a fractional scaling factor is being used)
+  ([#1404][1404]).
+* Initial font size being wrong on `fractional-scale-v1` capable
+  compositors, with multiple monitors with different scaling factors
+  connected ([#1404][1404]).
+* Crash when _pointer capability_ is removed from a seat, on
+  compositors without `cursor-shape-v1 support` ([#1411][1411]).
+* Crash on exit, if the mouse is hovering over the foot window (does
+  not happen on all compositors)
+* Visual glitches when CSD titlebar is transparent.
 
-[1317]: https://codeberg.org/dnkl/foot/issues/1317
+[1404]: https://codeberg.org/dnkl/foot/issues/1404
+[1411]: https://codeberg.org/dnkl/foot/pulls/1411
 
 
 ### Security
 ### Contributors
+
+
+## 1.15.0
+
+### Added
+
+* VT: implemented `XTQMODKEYS` query (`CSI ? Pp m`).
+* Meson option `utmp-backend=none|libutempter|ulog|auto`. The default
+  is `auto`, which will select `libutempter` on Linux, `ulog` on
+  FreeBSD, and `none` for all others.
+* Sixel aspect ratio.
+* Support for the new `fractional-scale-v1` Wayland protocol. This
+  brings true fractional scaling to Wayland in general, and with this
+  release, to foot.
+* Support for the new `cursor-shape-v1` Wayland protocol, i.e. server
+  side cursor shapes ([#1379][1379]).
+* Support for touchscreen input ([#517][517]).
+* `csd.double-click-to-maximize` option to `foot.ini`. Defaults to
+  `yes` ([#1293][1293]).
+
+[1379]: https://codeberg.org/dnkl/foot/issues/1379
+[517]: https://codeberg.org/dnkl/foot/issues/517
+[1293]: https://codeberg.org/dnkl/foot/issues/1293
+
+
+### Changed
+
+* Default color theme is now
+  [starlight](https://github.com/CosmicToast/starlight)
+  ([#1321][1321]).
+* Minimum required meson version is now 0.59 ([#1371][1371]).
+* `Control+Shift+u` is now bound to `unicode-input` instead of
+  `show-urls-launch`, to follow the convention established in GTK and
+  Qt ([#1183][1183]).
+* `show-urls-launch` now bound to `Control+Shift+o` ([#1183][1183]).
+* Kitty keyboard protocol: F3 is now encoded as `CSI 13~` instead of
+  `CSI R`. The kitty keyboard protocol originally allowed F3 to be
+  encoded as `CSI R`, but this was removed from the specification
+  since `CSI R` conflicts with the _”Cursor Position Report”_.
+* `[main].utempter` renamed to `[main].utmp-helper`. The old option
+  name is still recognized, but will log a deprecation warning.
+* Meson option `default-utempter-path` renamed to
+  `utmp-default-helper-path`.
+* Opaque sixels now retain the background opacity (when current
+  background color is the **default** background color)
+  ([#1360][1360]).
+* Text cursor’s vertical position after emitting a sixel, when sixel
+  scrolling is **enabled** (the default) has been updated to match
+  XTerm’s, and the VT382’s behavior: the cursor is positioned **on**
+  the last sixel row, rather than _after_ it. This allows printing
+  sixels on the last row without scrolling up, but also means
+  applications may have to explicitly emit a newline to ensure the
+  sixel is visible. For example, `cat`:ing a sixel in the shell will
+  typically result in the last row not being visible, unless a newline
+  is explicitly added.
+* Default sixel aspect ratio is now 2:1 instead of 1:1.
+* Sixel images are no longer cropped to the last non-transparent row.
+* Sixel images are now re-scaled when the font size is changed
+  ([#1383][1383]).
+* `dpi-aware` now defaults to `no`, and the `auto` value has been
+  removed.
+* When using custom cursor colors (`cursor.color` is set in
+  `foot.ini`), the cursor is no longer inverted when the cell is
+  selected, or when the cell has the `reverse` (SGR 7) attribute set
+  ([#1347][1347]).
+
+[1321]: https://codeberg.org/dnkl/foot/issues/1321
+[1371]: https://codeberg.org/dnkl/foot/pulls/1371
+[1183]: https://codeberg.org/dnkl/foot/issues/1183
+[1360]: https://codeberg.org/dnkl/foot/issues/1360
+[1383]: https://codeberg.org/dnkl/foot/issues/1383
+[1347]: https://codeberg.org/dnkl/foot/issues/1347
+
+
+### Deprecated
+
+* `[main].utempter` option.
+
+
+### Removed
+
+* `auto` value for the `dpi-aware` option.
+
+
+### Fixed
+
+* Incorrect icon in dock and window switcher on Gnome ([#1317][1317])
+* Crash when scrolling after resizing the window with non-zero
+  scrolling regions.
+* `XTMODKEYS` state not being reset on a terminal reset.
+* In Gnome dock foot always groups under "foot client".  Change
+  instances of footclient and foot to appear as "foot client" and
+  "foot" respectively. ([#1355][1355]).
+* Glitchy rendering when alpha (transparency) is changed between
+  opaque and non-opaque at runtime (using OSC-11).
+* Regression: crash when resizing the window when `resize-delay-ms >
+  0` ([#1377][1377]).
+* Crash when scrolling up while running something that generates a lot
+  of output (for example, `yes`) ([#1380][1380]).
+* Default key binding for URL mode conflicting with Unicode input on
+  some DEs; `show-urls-launched` is now mapped to `Control+Shift+o` by
+  default, instead of `Control+Shift+u` ([#1183][1183]).
+
+[1317]: https://codeberg.org/dnkl/foot/issues/1317
+[1355]: https://codeberg.org/dnkl/foot/issues/1355
+[1377]: https://codeberg.org/dnkl/foot/issues/1377
+[1380]: https://codeberg.org/dnkl/foot/issues/1380
+
+
+### Contributors
+
+* Antoine Beaupré
+* CismonX
+* Craig Barnes
+* Dan Bungert
+* jdevdevdev
+* Kyle Gunger
+* locture
+* Phillip Susi
+* sewn
+* ShugarSkull
+* Vivian Szczepanski
+* Vladimir Bauer
+* wout
+* CosmicToast
 
 
 ## 1.14.0
@@ -100,7 +238,7 @@
 * “Report DA2” terminfo entries (`RV`/`rv`).
 * `XF` terminfo capability (focus in/out events available).
 * `$TERM_PROGRAM` and `$TERM_PROGRAM_VERSION` environment variables
-  set in the slave process.
+  unset in the slave process.
 
 [1136]: https://codeberg.org/dnkl/foot/issues/1136
 [1225]: https://codeberg.org/dnkl/foot/issues/1225

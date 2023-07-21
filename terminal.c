@@ -47,20 +47,6 @@
 
 #define PTMX_TIMING 0
 
-const char *const XCURSOR_HIDDEN = "hidden";
-const char *const XCURSOR_LEFT_PTR = "left_ptr";
-const char *const XCURSOR_TEXT = "text";
-const char *const XCURSOR_TEXT_FALLBACK = "xterm";
-//const char *const XCURSOR_HAND2 = "hand2";
-const char *const XCURSOR_TOP_LEFT_CORNER = "top_left_corner";
-const char *const XCURSOR_TOP_RIGHT_CORNER = "top_right_corner";
-const char *const XCURSOR_BOTTOM_LEFT_CORNER = "bottom_left_corner";
-const char *const XCURSOR_BOTTOM_RIGHT_CORNER = "bottom_right_corner";
-const char *const XCURSOR_LEFT_SIDE = "left_side";
-const char *const XCURSOR_RIGHT_SIDE = "right_side";
-const char *const XCURSOR_TOP_SIDE = "top_side";
-const char *const XCURSOR_BOTTOM_SIDE = "bottom_side";
-
 static void
 enqueue_data_for_slave(const void *data, size_t len, size_t offset,
                        ptmx_buffer_list_t *buffer_list)
@@ -207,25 +193,41 @@ fdm_ptmx_out(struct fdm *fdm, int fd, int events, void *data)
 static bool
 add_utmp_record(const struct config *conf, struct reaper *reaper, int ptmx)
 {
+#if defined(UTMP_ADD)
     if (ptmx < 0)
         return true;
-    if (conf->utempter_path == NULL)
+    if (conf->utmp_helper_path == NULL)
         return true;
 
-    char *const argv[] = {conf->utempter_path, "add", getenv("WAYLAND_DISPLAY"), NULL};
+    char *const argv[] = {conf->utmp_helper_path, UTMP_ADD, getenv("WAYLAND_DISPLAY"), NULL};
     return spawn(reaper, NULL, argv, ptmx, ptmx, -1, NULL);
+#else
+    return true;
+#endif
 }
 
 static bool
 del_utmp_record(const struct config *conf, struct reaper *reaper, int ptmx)
 {
+#if defined(UTMP_DEL)
     if (ptmx < 0)
         return true;
-    if (conf->utempter_path == NULL)
+    if (conf->utmp_helper_path == NULL)
         return true;
 
-    char *const argv[] = {conf->utempter_path, "del", getenv("WAYLAND_DISPLAY"), NULL};
+    char *del_argument =
+#if defined(UTMP_DEL_HAVE_ARGUMENT)
+        getenv("WAYLAND_DISPLAY")
+#else
+        NULL
+#endif
+        ;
+
+    char *const argv[] = {conf->utmp_helper_path, UTMP_DEL, del_argument, NULL};
     return spawn(reaper, NULL, argv, ptmx, ptmx, -1, NULL);
+#else
+    return true;
+#endif
 }
 
 #if PTMX_TIMING
@@ -406,11 +408,6 @@ fdm_flash(struct fdm *fdm, int fd, int events, void *data)
 
     term->flash.active = false;
     render_refresh(term);
-
-    /* Work around Sway bug - unmapping a sub-surface does not damage
-     * the underlying surface */
-    term_damage_margins(term);
-    term_damage_view(term);
     return true;
 }
 
@@ -736,7 +733,8 @@ term_line_height_update(struct terminal *term)
 }
 
 static bool
-term_set_fonts(struct terminal *term, struct fcft_font *fonts[static 4])
+term_set_fonts(struct terminal *term, struct fcft_font *fonts[static 4],
+               bool resize_grid)
 {
     for (size_t i = 0; i < 4; i++) {
         xassert(fonts[i] != NULL);
@@ -751,9 +749,6 @@ term_set_fonts(struct terminal *term, struct fcft_font *fonts[static 4])
         &term->custom_glyphs.braille, GLYPH_BRAILLE_COUNT);
     free_custom_glyphs(
         &term->custom_glyphs.legacy, GLYPH_LEGACY_COUNT);
-
-    const int old_cell_width = term->cell_width;
-    const int old_cell_height = term->cell_height;
 
     const struct config *conf = term->conf;
 
@@ -781,31 +776,17 @@ term_set_fonts(struct terminal *term, struct fcft_font *fonts[static 4])
 
     LOG_INFO("cell width=%d, height=%d", term->cell_width, term->cell_height);
 
-    if (term->cell_width < old_cell_width ||
-        term->cell_height < old_cell_height)
-    {
-        /*
-         * The cell size has decreased.
-         *
-         * This means sixels, which we cannot resize, no longer fit
-         * into their "allocated" grid space.
-         *
-         * To be able to fit them, we would have to change the grid
-         * content. Inserting empty lines _might_ seem acceptable, but
-         * we'd also need to insert empty columns, which would break
-         * existing layout completely.
-         *
-         * So we delete them.
-         */
-        sixel_destroy_all(term);
-    } else if (term->cell_width != old_cell_width ||
-               term->cell_height != old_cell_height)
-    {
-        sixel_cell_size_changed(term);
-    }
+    sixel_cell_size_changed(term);
 
-    /* Use force, since cell-width/height may have changed */
-    render_resize_force(term, term->width / term->scale, term->height / term->scale);
+    /* Optimization - some code paths (are forced to) call
+     * render_resize() after this function */
+    if (resize_grid) {
+        /* Use force, since cell-width/height may have changed */
+        render_resize_force(
+            term,
+            round(term->width / term->scale),
+            round(term->height / term->scale));
+    }
     return true;
 }
 
@@ -820,41 +801,34 @@ get_font_dpi(const struct terminal *term)
      * Conceptually, we use the physical monitor specs to calculate
      * the DPI, and we ignore the output's scaling factor.
      *
-     * However, to deal with fractional scaling, where we're told to
-     * render at e.g. 2x, but are then downscaled by the compositor to
-     * e.g. 1.25, we use the scaled DPI value multiplied by the scale
-     * factor instead.
+     * However, to deal with legacy fractional scaling, where we're
+     * told to render at e.g. 2x, but are then downscaled by the
+     * compositor to e.g. 1.25, we use the scaled DPI value multiplied
+     * by the scale factor instead.
      *
      * For integral scaling factors the resulting DPI is the same as
      * if we had used the physical DPI.
      *
-     * For fractional scaling factors we'll get a DPI *larger* than
-     * the physical DPI, that ends up being right when later
+     * For legacy fractional scaling factors we'll get a DPI *larger*
+     * than the physical DPI, that ends up being right when later
      * downscaled by the compositor.
+     *
+     * With the newer fractional-scale-v1 protocol, we use the
+     * monitor’s real DPI, since we scale everything to the correct
+     * scaling factor (no downscaling done by the compositor).
      */
 
-    /* Use highest DPI from outputs we're mapped on */
-    double dpi = 0.0;
-    xassert(term->window != NULL);
-    tll_foreach(term->window->on_outputs, it) {
-        if (it->item->dpi > dpi)
-            dpi = it->item->dpi;
-    }
+    xassert(tll_length(term->wl->monitors) > 0);
 
-    /* If we're not mapped, use DPI from first monitor. Hopefully this is where we'll get mapped later... */
-    if (dpi == 0.) {
-        tll_foreach(term->wl->monitors, it) {
-            dpi = it->item.dpi;
-            break;
-        }
-    }
+    const struct wl_window *win = term->window;
+    const struct monitor *mon = tll_length(win->on_outputs) > 0
+        ? tll_back(win->on_outputs)
+        : &tll_front(term->wl->monitors);
 
-    if (dpi == 0) {
-        /* No monitors? */
-        dpi = 96.;
-    }
-
-    return dpi;
+    if (wayl_fractional_scaling(term->wl))
+        return mon->dpi.physical;
+    else
+        return mon->dpi.scaled;
 }
 
 static enum fcft_subpixel
@@ -873,7 +847,8 @@ get_font_subpixel(const struct terminal *term)
      * output or not.
      *
      * Thus, when determining which subpixel mode to use, we can't do
-     * much but select *an* output. So, we pick the first one.
+     * much but select *an* output. So, we pick the one we were most
+     * recently mapped on.
      *
      * If we're not mapped at all, we pick the first available
      * monitor, and hope that's where we'll eventually get mapped.
@@ -883,7 +858,7 @@ get_font_subpixel(const struct terminal *term)
      */
 
     if (tll_length(term->window->on_outputs) > 0)
-        wl_subpixel = tll_front(term->window->on_outputs)->subpixel;
+        wl_subpixel = tll_back(term->window->on_outputs)->subpixel;
     else if (tll_length(term->wl->monitors) > 0)
         wl_subpixel = tll_front(term->wl->monitors).subpixel;
     else
@@ -899,42 +874,6 @@ get_font_subpixel(const struct terminal *term)
     }
 
     return FCFT_SUBPIXEL_DEFAULT;
-}
-
-static bool
-term_font_size_by_dpi(const struct terminal *term)
-{
-    switch (term->conf->dpi_aware) {
-    case DPI_AWARE_YES:  return true;
-    case DPI_AWARE_NO:   return false;
-
-    case DPI_AWARE_AUTO:
-        /*
-         * Scale using DPI if all monitors have a scaling factor or 1.
-         *
-         * The idea is this: if a user, with multiple monitors, have
-         * enabled scaling on at least one monitor, then he/she has
-         * most likely done so to match the size of his/hers other
-         * monitors.
-         *
-         * I.e. if the user has one monitor with a scaling factor of
-         * one, and another with a scaling factor of two, he/she
-         * expects things to be twice as large on the second
-         * monitor.
-         *
-         * If we (foot) scale using DPI on the first monitor, and
-         * using the scaling factor on the second monitor, foot will
-         * *not* look twice as big on the second monitor.
-         */
-        tll_foreach(term->wl->monitors, it) {
-            const struct monitor *mon = &it->item;
-            if (mon->scale > 1)
-                return false;
-        }
-        return true;
-    }
-
-    BUG("unhandled DPI awareness value");
 }
 
 int
@@ -966,7 +905,7 @@ font_loader_thread(void *_data)
 }
 
 static bool
-reload_fonts(struct terminal *term)
+reload_fonts(struct terminal *term, bool resize_grid)
 {
     const struct config *conf = term->conf;
 
@@ -989,14 +928,14 @@ reload_fonts(struct terminal *term)
             bool use_px_size = term->font_sizes[i][j].px_size > 0;
             char size[64];
 
-            const int scale = term->font_is_sized_by_dpi ? 1 : term->scale;
+            const float scale = term->font_is_sized_by_dpi ? 1. : term->scale;
 
             if (use_px_size)
                 snprintf(size, sizeof(size), ":pixelsize=%d",
-                         term->font_sizes[i][j].px_size * scale);
+                         (int)round(term->font_sizes[i][j].px_size * scale));
             else
                 snprintf(size, sizeof(size), ":size=%.2f",
-                         term->font_sizes[i][j].pt_size * (double)scale);
+                         term->font_sizes[i][j].pt_size * scale);
 
             size_t len = strlen(font->pattern) + strlen(size) + 1;
             names[i][j] = xmalloc(len);
@@ -1093,7 +1032,7 @@ reload_fonts(struct terminal *term)
         }
     }
 
-    return success ? term_set_fonts(term, fonts) : success;
+    return success ? term_set_fonts(term, fonts, resize_grid) : success;
 }
 
 static bool
@@ -1111,7 +1050,7 @@ load_fonts_from_conf(struct terminal *term)
         }
     }
 
-    return reload_fonts(term);
+    return reload_fonts(term, true);
 }
 
 static void fdm_client_terminated(
@@ -1221,7 +1160,7 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         .reverse_wrap = true,
         .auto_margin = true,
         .window_title_stack = tll_init(),
-        .scale = 1,
+        .scale = 1.,
         .flash = {.fd = flash_fd},
         .blink = {.fd = -1},
         .vt = {
@@ -1345,11 +1284,9 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
     reaper_add(term->reaper, term->slave, &fdm_client_terminated, term);
 
     /* Guess scale; we're not mapped yet, so we don't know on which
-     * output we'll be. Pick highest scale we find for now */
-    tll_foreach(term->wl->monitors, it) {
-        if (it->item.scale > term->scale)
-            term->scale = it->item.scale;
-    }
+     * output we'll be. Use scaling factor from first monitor */
+    xassert(tll_length(term->wl->monitors) > 0);
+    term->scale = tll_front(term->wl->monitors).scale;
 
     memcpy(term->colors.table, term->conf->colors.table, sizeof(term->colors.table));
 
@@ -1358,7 +1295,7 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         goto err;
 
     /* Load fonts */
-    if (!term_font_dpi_changed(term, 0))
+    if (!term_font_dpi_changed(term, 0.))
         goto err;
 
     term->font_subpixel = get_font_subpixel(term);
@@ -1670,8 +1607,6 @@ term_destroy(struct terminal *term)
     if (term == NULL)
         return 0;
 
-    key_binding_unref(term->wl->key_binding_manager, term->conf);
-
     tll_foreach(term->wl->terms, it) {
         if (it->item == term) {
             tll_remove(term->wl->terms, it);
@@ -1716,6 +1651,8 @@ term_destroy(struct terminal *term)
         }
     }
     mtx_unlock(&term->render.workers.lock);
+
+    key_binding_unref(term->wl->key_binding_manager, term->conf);
 
     urls_reset(term);
 
@@ -1933,6 +1870,7 @@ term_reset(struct terminal *term, bool hard)
 
     term_set_user_mouse_cursor(term, NULL);
 
+    term->modify_other_keys_2 = false;
     memset(term->normal.kitty_kbd.flags, 0, sizeof(term->normal.kitty_kbd.flags));
     memset(term->alt.kitty_kbd.flags, 0, sizeof(term->alt.kitty_kbd.flags));
     term->normal.kitty_kbd.idx = term->alt.kitty_kbd.idx = 0;
@@ -2055,7 +1993,7 @@ term_font_size_adjust_by_points(struct terminal *term, float amount)
         }
     }
 
-    return reload_fonts(term);
+    return reload_fonts(term, true);
 }
 
 static bool
@@ -2078,7 +2016,7 @@ term_font_size_adjust_by_pixels(struct terminal *term, int amount)
         }
     }
 
-    return reload_fonts(term);
+    return reload_fonts(term, true);
 }
 
 static bool
@@ -2102,7 +2040,7 @@ term_font_size_adjust_by_percent(struct terminal *term, bool increment, float pe
         }
     }
 
-    return reload_fonts(term);
+    return reload_fonts(term, true);
 }
 
 bool
@@ -2140,13 +2078,43 @@ term_font_size_reset(struct terminal *term)
 }
 
 bool
-term_font_dpi_changed(struct terminal *term, int old_scale)
+term_update_scale(struct terminal *term)
+{
+    const struct wl_window *win = term->window;
+
+    /*
+     * We have a number of “sources” we can use as scale. We choose
+     * the scale in the following order:
+     *
+     *  - “preferred” scale, from the fractional-scale-v1 protocol
+     *  - scaling factor of output we most recently were mapped on
+     *  - if we’re not mapped, use the scaling factor from the first
+     *    available output.
+     *  - if there aren’t any outputs available, use 1.0
+     */
+    const float new_scale =
+        (wayl_fractional_scaling(term->wl) && win->scale > 0.
+         ? win->scale
+         : (tll_length(win->on_outputs) > 0
+            ? tll_back(win->on_outputs)->scale
+            : 1.));
+
+    if (new_scale == term->scale)
+        return false;
+
+    LOG_DBG("scaling factor changed: %.2f -> %.2f", term->scale, new_scale);
+    term->scale = new_scale;
+    return true;
+}
+
+bool
+term_font_dpi_changed(struct terminal *term, float old_scale)
 {
     float dpi = get_font_dpi(term);
-    xassert(term->scale > 0);
+    xassert(term->scale > 0.);
 
     bool was_scaled_using_dpi = term->font_is_sized_by_dpi;
-    bool will_scale_using_dpi = term_font_size_by_dpi(term);
+    bool will_scale_using_dpi = term->conf->dpi_aware;
 
     bool need_font_reload =
         was_scaled_using_dpi != will_scale_using_dpi ||
@@ -2155,11 +2123,10 @@ term_font_dpi_changed(struct terminal *term, int old_scale)
          : old_scale != term->scale);
 
     if (need_font_reload) {
-        LOG_DBG("DPI/scale change: DPI-awareness=%s, "
-                "DPI: %.2f -> %.2f, scale: %d -> %d, "
+        LOG_DBG("DPI/scale change: DPI-aware=%s, "
+                "DPI: %.2f -> %.2f, scale: %.2f -> %.2f, "
                 "sizing font based on monitor's %s",
-                term->conf->dpi_aware == DPI_AWARE_AUTO ? "auto" :
-                term->conf->dpi_aware == DPI_AWARE_YES ? "yes" : "no",
+                term->conf->dpi_aware ? "yes" : "no",
                 term->font_dpi, dpi, old_scale, term->scale,
                 will_scale_using_dpi ? "DPI" : "scaling factor");
     }
@@ -2168,9 +2135,9 @@ term_font_dpi_changed(struct terminal *term, int old_scale)
     term->font_is_sized_by_dpi = will_scale_using_dpi;
 
     if (!need_font_reload)
-        return true;
+        return false;
 
-    return reload_fonts(term);
+    return reload_fonts(term, false);
 }
 
 void
@@ -2546,6 +2513,15 @@ term_cursor_home(struct terminal *term)
 }
 
 void
+term_cursor_col(struct terminal *term, int col)
+{
+    xassert(col < term->cols);
+
+    term->grid->cursor.lcf = false;
+    term->grid->cursor.point.col = col;
+}
+
+void
 term_cursor_left(struct terminal *term, int count)
 {
     int move_amount = min(term->grid->cursor.point.col, count);
@@ -2693,6 +2669,7 @@ term_scroll_partial(struct terminal *term, struct scroll_region region, int rows
     term->grid->offset &= term->grid->num_rows - 1;
 
     if (likely(view_follows)) {
+        term_damage_scroll(term, DAMAGE_SCROLL, region, rows);
         selection_view_down(term, term->grid->offset);
         term->grid->view = term->grid->offset;
     } else if (unlikely(rows > view_sb_start_distance)) {
@@ -2716,13 +2693,12 @@ term_scroll_partial(struct terminal *term, struct scroll_region region, int rows
         erase_line(term, row);
     }
 
+    term->grid->cur_row = grid_row(term->grid, term->grid->cursor.point.row);
+
 #if defined(_DEBUG)
     for (int r = 0; r < term->rows; r++)
         xassert(grid_row(term->grid, r) != NULL);
 #endif
-
-    term_damage_scroll(term, DAMAGE_SCROLL, region, rows);
-    term->grid->cur_row = grid_row(term->grid, term->grid->cursor.point.row);
 }
 
 void
@@ -2779,6 +2755,7 @@ term_scroll_reverse_partial(struct terminal *term,
     xassert(term->grid->offset < term->grid->num_rows);
 
     if (view_follows) {
+        term_damage_scroll(term, DAMAGE_SCROLL_REVERSE, region, rows);
         selection_view_up(term, term->grid->offset);
         term->grid->view = term->grid->offset;
     }
@@ -2797,7 +2774,6 @@ term_scroll_reverse_partial(struct terminal *term,
         erase_line(term, row);
     }
 
-    term_damage_scroll(term, DAMAGE_SCROLL_REVERSE, region, rows);
     term->grid->cur_row = grid_row(term->grid, term->grid->cursor.point.row);
 
 #if defined(_DEBUG)
@@ -3176,44 +3152,56 @@ term_mouse_motion(struct terminal *term, int button, int row, int col,
 void
 term_xcursor_update_for_seat(struct terminal *term, struct seat *seat)
 {
-    const char *xcursor = NULL;
+    enum cursor_shape shape = CURSOR_SHAPE_NONE;
 
     switch (term->active_surface) {
-    case TERM_SURF_GRID: {
-        bool have_custom_cursor =
-            render_xcursor_is_valid(seat, term->mouse_user_cursor);
+    case TERM_SURF_GRID:
+        if (seat->pointer.hidden)
+            shape = CURSOR_SHAPE_HIDDEN;
 
-        xcursor = seat->pointer.hidden ? XCURSOR_HIDDEN
-            : have_custom_cursor ? term->mouse_user_cursor
-            : term->is_searching ? XCURSOR_LEFT_PTR
-            : (seat->mouse.col >= 0 &&
-               seat->mouse.row >= 0 &&
-               term_mouse_grabbed(term, seat)) ? XCURSOR_TEXT
-            : XCURSOR_LEFT_PTR;
+#if defined(HAVE_CURSOR_SHAPE)
+        else if (cursor_string_to_server_shape(term->mouse_user_cursor) != 0
+#else
+        else if (false
+#endif
+                 || render_xcursor_is_valid(seat, term->mouse_user_cursor))
+        {
+            shape = CURSOR_SHAPE_CUSTOM;
+        }
+
+        else if (seat->mouse.col >= 0 &&
+                 seat->mouse.row >= 0 &&
+                 term_mouse_grabbed(term, seat))
+        {
+            shape = CURSOR_SHAPE_TEXT;
+        }
+
+        else
+            shape = CURSOR_SHAPE_LEFT_PTR;
         break;
-    }
+
     case TERM_SURF_TITLE:
     case TERM_SURF_BUTTON_MINIMIZE:
     case TERM_SURF_BUTTON_MAXIMIZE:
     case TERM_SURF_BUTTON_CLOSE:
-        xcursor = XCURSOR_LEFT_PTR;
+        shape = CURSOR_SHAPE_LEFT_PTR;
         break;
 
     case TERM_SURF_BORDER_LEFT:
     case TERM_SURF_BORDER_RIGHT:
     case TERM_SURF_BORDER_TOP:
     case TERM_SURF_BORDER_BOTTOM:
-        xcursor = xcursor_for_csd_border(term, seat->mouse.x, seat->mouse.y);
+        shape = xcursor_for_csd_border(term, seat->mouse.x, seat->mouse.y);
         break;
 
     case TERM_SURF_NONE:
         return;
     }
 
-    if (xcursor == NULL)
+    if (shape == CURSOR_SHAPE_NONE)
         BUG("xcursor not set");
 
-    render_xcursor_set(seat, term, xcursor);
+    render_xcursor_set(seat, term, shape);
 }
 
 void
@@ -3548,7 +3536,7 @@ term_update_ascii_printer(struct terminal *term)
 
 #if defined(_DEBUG) && LOG_ENABLE_DBG
     if (term->ascii_printer != new_printer) {
-        LOG_DBG("§switching ASCII printer %s -> %s",
+        LOG_DBG("switching ASCII printer %s -> %s",
                 term->ascii_printer == &ascii_printer_fast ? "fast" : "generic",
                 new_printer == &ascii_printer_fast ? "fast" : "generic");
     }
@@ -3568,23 +3556,23 @@ term_single_shift(struct terminal *term, enum charset_designator idx)
 enum term_surface
 term_surface_kind(const struct terminal *term, const struct wl_surface *surface)
 {
-    if (likely(surface == term->window->surface))
+    if (likely(surface == term->window->surface.surf))
         return TERM_SURF_GRID;
-    else if (surface == term->window->csd.surface[CSD_SURF_TITLE].surf)
+    else if (surface == term->window->csd.surface[CSD_SURF_TITLE].surface.surf)
         return TERM_SURF_TITLE;
-    else if (surface == term->window->csd.surface[CSD_SURF_LEFT].surf)
+    else if (surface == term->window->csd.surface[CSD_SURF_LEFT].surface.surf)
         return TERM_SURF_BORDER_LEFT;
-    else if (surface == term->window->csd.surface[CSD_SURF_RIGHT].surf)
+    else if (surface == term->window->csd.surface[CSD_SURF_RIGHT].surface.surf)
         return TERM_SURF_BORDER_RIGHT;
-    else if (surface == term->window->csd.surface[CSD_SURF_TOP].surf)
+    else if (surface == term->window->csd.surface[CSD_SURF_TOP].surface.surf)
         return TERM_SURF_BORDER_TOP;
-    else if (surface == term->window->csd.surface[CSD_SURF_BOTTOM].surf)
+    else if (surface == term->window->csd.surface[CSD_SURF_BOTTOM].surface.surf)
         return TERM_SURF_BORDER_BOTTOM;
-    else if (surface == term->window->csd.surface[CSD_SURF_MINIMIZE].surf)
+    else if (surface == term->window->csd.surface[CSD_SURF_MINIMIZE].surface.surf)
         return TERM_SURF_BUTTON_MINIMIZE;
-    else if (surface == term->window->csd.surface[CSD_SURF_MAXIMIZE].surf)
+    else if (surface == term->window->csd.surface[CSD_SURF_MAXIMIZE].surface.surf)
         return TERM_SURF_BUTTON_MAXIMIZE;
-    else if (surface == term->window->csd.surface[CSD_SURF_CLOSE].surf)
+    else if (surface == term->window->csd.surface[CSD_SURF_CLOSE].surface.surf)
         return TERM_SURF_BUTTON_CLOSE;
     else
         return TERM_SURF_NONE;
@@ -3764,6 +3752,8 @@ void
 term_set_user_mouse_cursor(struct terminal *term, const char *cursor)
 {
     free(term->mouse_user_cursor);
-    term->mouse_user_cursor = cursor != NULL ? xstrdup(cursor) : NULL;
+    term->mouse_user_cursor = cursor != NULL && strlen(cursor) > 0
+        ? xstrdup(cursor)
+        : NULL;
     term_xcursor_update(term);
 }

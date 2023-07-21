@@ -65,7 +65,7 @@ the foot command line
 
 *-a*,*--app-id*=_ID_
 	Value to set the *app-id* property on the Wayland window
-	to. Default: _foot_.
+	to. Default: _foot_ (normal mode), or _footclient_ (server mode).
 
 *-m*,*--maximized*
 	Start in maximized mode. If both *--maximized* and *--fullscreen*
@@ -202,8 +202,11 @@ default) available; see *foot.ini*(5).
 	_OSC 7_ escape sequence, the new terminal will start in the
 	current working directory.
 
-*ctrl*+*shift*+*u*
+*ctrl*+*shift*+*o*
 	Activate URL mode, allowing you to "launch" URLs.
+
+*ctrl*+*shift*+*u*
+	Activate Unicode input.
 
 *ctrl*+*shift*+*z*
 	Jump to the previous, currently not visible, prompt. Requires
@@ -283,6 +286,18 @@ default) available; see *foot.ini*(5).
 *wheel*
 	Scroll up/down in history
 
+## TOUCHSCREEN
+
+*tap*
+	Emulates mouse left button click.
+
+*drag*
+	Scrolls up/down in history.
+
+	Holding for a while before dragging (time delay can be configured)
+	emulates mouse dragging with left button held.
+
+
 # FONT FORMAT
 
 The font is specified in FontConfig syntax. That is, a colon-separated
@@ -298,7 +313,7 @@ Foot supports URL detection. But, unlike many other terminal
 emulators, where URLs are highlighted when they are hovered and opened
 by clicking on them, foot uses a keyboard driven approach.
 
-Pressing *ctrl*+*shift*+*u* enters _“URL mode”_, where all currently
+Pressing *ctrl*+*shift*+*o* enters _“Open URL mode”_, where all currently
 visible URLs are underlined, and is associated with a
 _“jump-label”_. The jump-label indicates the _key sequence_
 (e.g. *”AF”*) to use to activate the URL.
@@ -545,17 +560,6 @@ In all other cases, the exit code is that of the client application
 *COLORTERM*
 	This variable is set to *truecolor*, to indicate to client
 	applications that 24-bit RGB colors are supported.
-
-*TERM_PROGRAM*
-	Always set to *foot*. This can be used by client applications to
-	check which terminal is in use, but with the caveat that it may
-	have been inherited from a parent process in other terminals that
-	aren't known to set the variable.
-
-*TERM_PROGRAM_VERSION*
-	Set to the foot version string, in the format _major_*.*_minor_*.*_patch_
-	or _major_*.*_minor_*.*_patch_*-*_revision_*-\g*_commit_ for inter-release
-	builds. The same caveat as for *TERM_PROGRAM* applies.
 
 In addition to the variables listed above, custom environment
 variables may be defined in *foot.ini*(5).

@@ -76,15 +76,15 @@ render_xcursor_is_valid(const struct seat *seat, const char *cursor)
 }
 
 bool
-render_xcursor_set(struct seat *seat, struct terminal *term, const char *xcursor)
+render_xcursor_set(struct seat *seat, struct terminal *term, enum cursor_shape shape)
 {
     return true;
 }
 
-const char *
+enum cursor_shape
 xcursor_for_csd_border(struct terminal *term, int x, int y)
 {
-    return XCURSOR_LEFT_PTR;
+    return CURSOR_SHAPE_LEFT_PTR;
 }
 
 struct wl_window *
@@ -94,7 +94,9 @@ wayl_win_init(struct terminal *term, const char *token)
 }
 
 void wayl_win_destroy(struct wl_window *win) {}
+void wayl_win_alpha_changed(struct wl_window *win) {}
 bool wayl_win_set_urgent(struct wl_window *win) { return true; }
+bool wayl_fractional_scaling(const struct wayland *wayl) { return true; }
 
 bool
 spawn(struct reaper *reaper, const char *cwd, char *const argv[],

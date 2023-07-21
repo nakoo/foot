@@ -107,6 +107,50 @@ test_c32string(struct context *ctx, bool (*parse_fun)(struct context *ctx),
 }
 
 static void
+test_protocols(struct context *ctx, bool (*parse_fun)(struct context *ctx),
+               const char *key, char32_t **const *ptr)
+{
+    ctx->key = key;
+
+    static const struct {
+        const char *option_string;
+        int count;
+        const char32_t *value[2];
+        bool invalid;
+    } input[] = {
+        {""},
+        {"http", 1, {U"http://"}},
+        {" http", 1, {U"http://"}},
+        {"http, https", 2, {U"http://", U"https://"}},
+        {"longprotocolislong", 1, {U"longprotocolislong://"}},
+    };
+
+    for (size_t i = 0; i < ALEN(input); i++) {
+        ctx->value = input[i].option_string;
+
+        if (input[i].invalid) {
+            if (parse_fun(ctx)) {
+                BUG("[%s].%s=%s: did not fail to parse as expected",
+                    ctx->section, ctx->key, &ctx->value[0]);
+            }
+        } else {
+            if (!parse_fun(ctx)) {
+                BUG("[%s].%s=%s: failed to parse",
+                    ctx->section, ctx->key, &ctx->value[0]);
+            }
+            for (int c = 0; c < input[i].count; c++) {
+                if (c32cmp((*ptr)[c], input[i].value[c]) != 0) {
+                    BUG("[%s].%s=%s: set value[%d] (%ls) not the expected one (%ls)",
+                        ctx->section, ctx->key, &ctx->value[c], c,
+                        (const wchar_t *)(*ptr)[c],
+                        (const wchar_t *)input[i].value[c]);
+                }
+            }
+        }
+    }
+}
+
+static void
 test_boolean(struct context *ctx, bool (*parse_fun)(struct context *ctx),
              const char *key, const bool *ptr)
 {
@@ -458,7 +502,8 @@ test_section_main(void)
     test_string(&ctx, &parse_section_main, "shell", &conf.shell);
     test_string(&ctx, &parse_section_main, "term", &conf.term);
     test_string(&ctx, &parse_section_main, "app-id", &conf.app_id);
-    test_string(&ctx, &parse_section_main, "utempter", &conf.utempter_path);
+    test_string(&ctx, &parse_section_main, "utempter", &conf.utmp_helper_path);
+    test_string(&ctx, &parse_section_main, "utmp-helper", &conf.utmp_helper_path);
 
     test_c32string(&ctx, &parse_section_main, "word-delimiters", &conf.word_delimiters);
 
@@ -466,6 +511,7 @@ test_section_main(void)
     test_boolean(&ctx, &parse_section_main, "box-drawings-uses-font-glyphs", &conf.box_drawings_uses_font_glyphs);
     test_boolean(&ctx, &parse_section_main, "locked-title", &conf.locked_title);
     test_boolean(&ctx, &parse_section_main, "notify-focus-inhibit", &conf.notify_focus_inhibit);
+    test_boolean(&ctx, &parse_section_main, "dpi-aware", &conf.dpi_aware);
 
     test_pt_or_px(&ctx, &parse_section_main, "font-size-adjustment", &conf.font_size_adjustment.pt_or_px);  /* TODO: test ‘N%’ values too */
     test_pt_or_px(&ctx, &parse_section_main, "line-height", &conf.line_height);
@@ -478,17 +524,6 @@ test_section_main(void)
     test_uint16(&ctx, &parse_section_main, "workers", &conf.render_worker_count);
 
     test_spawn_template(&ctx, &parse_section_main, "notify", &conf.notify);
-
-    test_enum(
-        &ctx, &parse_section_main, "dpi-aware",
-        9,
-        (const char *[]){"on", "true", "yes", "1",
-                         "off", "false", "no", "0",
-                         "auto"},
-        (int []){DPI_AWARE_YES, DPI_AWARE_YES, DPI_AWARE_YES, DPI_AWARE_YES,
-                 DPI_AWARE_NO, DPI_AWARE_NO, DPI_AWARE_NO, DPI_AWARE_NO,
-                 DPI_AWARE_AUTO},
-        (int *)&conf.dpi_aware);
 
     test_enum(&ctx, &parse_section_main, "selection-target",
               4,
@@ -577,8 +612,8 @@ test_section_url(void)
               (int []){OSC8_UNDERLINE_URL_MODE, OSC8_UNDERLINE_ALWAYS},
               (int *)&conf.url.osc8_underline);
     test_c32string(&ctx, &parse_section_url, "label-letters", &conf.url.label_letters);
+    test_protocols(&ctx, &parse_section_url, "protocols", &conf.url.protocols);
 
-    /* TODO: protocols (list of wchars) */
     /* TODO: uri-characters (wchar string, but sorted) */
 
     config_free(&conf);
@@ -623,6 +658,21 @@ test_section_mouse(void)
                  &conf.mouse.hide_when_typing);
     test_boolean(&ctx, &parse_section_mouse, "alternate-scroll-mode",
                  &conf.mouse.alternate_scroll_mode);
+
+    config_free(&conf);
+}
+
+static void
+test_section_touch(void)
+{
+    struct config conf = {0};
+    struct context ctx = {
+        .conf = &conf, .section = "touch", .path = "unittest"};
+
+    test_invalid_key(&ctx, &parse_section_touch, "invalid-key");
+
+    test_uint32(&ctx, &parse_section_touch, "long-press-delay",
+                &conf.touch.long_press_delay);
 
     config_free(&conf);
 }
@@ -727,6 +777,8 @@ test_section_csd(void)
                &conf.csd.color.quit);
     test_boolean(&ctx, &parse_section_csd, "hide-when-maximized",
                  &conf.csd.hide_when_maximized);
+    test_boolean(&ctx, &parse_section_csd, "double-click-to-maximize",
+                 &conf.csd.double_click_to_maximize);
 
     /* TODO: verify the ‘set’ bit is actually set for colors */
     /* TODO: font */
@@ -1312,6 +1364,7 @@ main(int argc, const char *const *argv)
     test_section_url();
     test_section_cursor();
     test_section_mouse();
+    test_section_touch();
     test_section_colors();
     test_section_csd();
     test_section_key_bindings();

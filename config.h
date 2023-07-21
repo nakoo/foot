@@ -137,7 +137,7 @@ struct config {
 
     enum { STARTUP_WINDOWED, STARTUP_MAXIMIZED, STARTUP_FULLSCREEN } startup_mode;
 
-    enum {DPI_AWARE_AUTO, DPI_AWARE_YES, DPI_AWARE_NO} dpi_aware;
+    bool dpi_aware;
     struct config_font_list fonts[4];
     struct font_size_adjustment font_size_adjustment;
 
@@ -285,6 +285,7 @@ struct config {
         uint16_t button_width;
 
         bool hide_when_maximized;
+        bool double_click_to_maximize;
 
         struct {
             bool title_set:1;
@@ -320,7 +321,7 @@ struct config {
 
     env_var_list_t env_vars;
 
-    char *utempter_path;
+    char *utmp_helper_path;
 
     struct {
         enum fcft_scaling_filter fcft_filter;
@@ -347,6 +348,10 @@ struct config {
         bool sixel;
     } tweak;
 
+    struct {
+        uint32_t long_press_delay;
+    } touch;
+
     user_notifications_t notifications;
 };
 
@@ -355,7 +360,8 @@ bool config_override_apply(struct config *conf, config_override_t *overrides,
 bool config_load(
     struct config *conf, const char *path,
     user_notifications_t *initial_user_notifications,
-    config_override_t *overrides, bool errors_are_fatal);
+    config_override_t *overrides, bool errors_are_fatal,
+    bool as_server);
 void config_free(struct config *conf);
 struct config *config_clone(const struct config *old);
 
