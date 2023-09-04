@@ -910,6 +910,10 @@ osc_dispatch(struct terminal *term)
         }
         break;
 
+    case 176:
+        xdg_toplevel_set_app_id(term->window->xdg_toplevel, *string ? string : term->conf->app_id);
+        break;
+
     case 555:
         osc_flash(term);
         break;
