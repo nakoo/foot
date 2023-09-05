@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <limits.h>
+#include <linux/limits.h>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -3298,8 +3299,18 @@ term_bell(struct terminal *term)
 bool
 term_spawn_new(const struct terminal *term)
 {
+    /* Get working directory of footclient instead of server
+     * by reading the cwd symbolic link in /proc/<SlavePID>/cwd
+     */
+
+    char cwd_link[PATH_MAX];
+    char cwd[PATH_MAX];
+
+    snprintf(cwd_link, PATH_MAX, "/proc/%d/cwd", term->slave);
+    readlink(cwd_link, cwd, PATH_MAX);
+
     return spawn(
-        term->reaper, term->cwd, (char *const []){term->foot_exe, NULL},
+        term->reaper, cwd, (char *const []){term->foot_exe, NULL},
         -1, -1, -1, NULL);
 }
 
