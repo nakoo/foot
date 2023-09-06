@@ -3303,10 +3303,11 @@ term_spawn_new(const struct terminal *term)
      * by reading the cwd symbolic link in /proc/<SlavePID>/cwd
      */
 
-    char cwd_link[PATH_MAX];
+    /* cwd_link len 10 + floor(log10(2^32))+"-"+"\0" = 10 + 10 + 2 = 22 */
+    char cwd_link[22];
     char cwd[PATH_MAX];
 
-    snprintf(cwd_link, PATH_MAX, "/proc/%d/cwd", term->slave);
+    snprintf(cwd_link, sizeof(cwd_link), "/proc/%d/cwd", term->slave);
     readlink(cwd_link, cwd, PATH_MAX);
 
     return spawn(
