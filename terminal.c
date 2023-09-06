@@ -3308,7 +3308,9 @@ term_spawn_new(const struct terminal *term)
     char cwd[PATH_MAX];
 
     snprintf(cwd_link, sizeof(cwd_link), "/proc/%d/cwd", term->slave);
-    readlink(cwd_link, cwd, PATH_MAX);
+
+    ssize_t length = readlink(cwd_link, cwd, PATH_MAX);
+    cwd[length]=0;
 
     return spawn(
         term->reaper, cwd, (char *const []){term->foot_exe, NULL},
