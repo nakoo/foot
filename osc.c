@@ -911,7 +911,7 @@ osc_dispatch(struct terminal *term)
         break;
 
     case 176:
-        xdg_toplevel_set_app_id(term->window->xdg_toplevel, *string ? string : term->conf->app_id);
+        term_set_app_id(term, string);
         break;
 
     case 555:

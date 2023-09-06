@@ -477,6 +477,8 @@ struct terminal {
     bool window_title_has_been_set;
     char *window_title;
     tll(char *) window_title_stack;
+    char *app_id;
+    struct timespec app_id_last_update;
 
     struct {
         bool active;
@@ -824,6 +826,7 @@ void term_xcursor_update_for_seat(struct terminal *term, struct seat *seat);
 void term_set_user_mouse_cursor(struct terminal *term, const char *cursor);
 
 void term_set_window_title(struct terminal *term, const char *title);
+void term_set_app_id(struct terminal *term, const char *app_id);
 void term_flash(struct terminal *term, unsigned duration_ms);
 void term_bell(struct terminal *term);
 bool term_spawn_new(const struct terminal *term);

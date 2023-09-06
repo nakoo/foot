@@ -1662,6 +1662,7 @@ term_destroy(struct terminal *term)
 
     composed_free(term->composed);
 
+    free(term->app_id);
     free(term->window_title);
     tll_free_and_free(term->window_title_stack, free);
 
@@ -3244,6 +3245,34 @@ term_set_window_title(struct terminal *term, const char *title)
     term->window_title = xstrdup(title);
     render_refresh_title(term);
     term->window_title_has_been_set = true;
+}
+
+void
+term_set_app_id(struct terminal *term, const char *app_id)
+{
+    if (app_id != NULL && *app_id == '\0')
+        app_id = NULL;
+    if (term->app_id == NULL && app_id == NULL)
+        return;
+    if (term->app_id != NULL && app_id != NULL && strcmp(term->app_id, app_id) == 0)
+        return;
+
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) < 0)
+        return;
+    struct timespec diff;
+    timespec_sub(&now, &term->app_id_last_update, &diff);
+    if (diff.tv_sec == 0 && diff.tv_nsec < 8333 * 1000)
+        return;
+    term->app_id_last_update = now;
+
+    free(term->app_id);
+    if (app_id != NULL) {
+        term->app_id = xstrdup(app_id);
+    } else {
+        term->app_id = NULL;
+    }
+    xdg_toplevel_set_app_id(term->window->xdg_toplevel, term->app_id ? term->app_id : term->conf->app_id);
 }
 
 void
