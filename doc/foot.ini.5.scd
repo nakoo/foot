@@ -394,6 +394,12 @@ Note: do not set *TERM* here; use the *term* option in the main
 
 	Default: _no_
 
+*flash*
+	When set to _yes_, foot will emit the bell signal flashing the
+	terminal window whenever *BEL* is received.
+
+	Default: _no_
+
 *command*
 	When set, foot will execute this command when *BEL* is received.
 	Default: none
@@ -608,6 +614,18 @@ can configure the background transparency with the _alpha_ option.
 	*15*, see regular and bright defaults above; see
 	https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit for an
 	explanation of the remainder.
+
+*flash*
+	Color to use for the terminal window flash.
+
+	Default: _7f7fff_.
+
+
+*flash_alpha*
+	Flash translucency. A value in the range 0.0-1.0, where 0.0
+	means completely transparent, and 1.0 is opaque.
+
+	Default: _0.7_.
 
 *alpha*
 	Background translucency. A value in the range 0.0-1.0, where 0.0
