@@ -60,9 +60,12 @@
   row ([#1364][1364]).
 * Support for DECSET/DECRST/DECRQM 2027 (_Grapheme cluster
   processing_).
+* Support for visual bell which flashes the terminal window.
+  ([#1508][1508]).
 
 [1077]: https://codeberg.org/dnkl/foot/issues/1077
 [1364]: https://codeberg.org/dnkl/foot/issues/1364
+[1508]: https://codeberg.org/dnkl/foot/issues/1508
 
 
 ### Changed

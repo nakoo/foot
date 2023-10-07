@@ -1582,7 +1582,9 @@ render_overlay(struct terminal *term)
         break;
 
     case OVERLAY_FLASH:
-        color = color_hex_to_pixman_with_alpha(term->colors.flash, term->colors.flash_alpha);
+        color = color_hex_to_pixman_with_alpha(
+                term->conf->colors.flash,
+                term->conf->colors.flash_alpha);
         break;
     }
 

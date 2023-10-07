@@ -3294,7 +3294,7 @@ term_bell(struct terminal *term)
         notify_notify(term, "Bell", "Bell in terminal");
 
     if (term->conf->bell.flash)
-	    term_flash(term, 100);
+        term_flash(term, 100);
 
     if ((term->conf->bell.command.argv.args != NULL) &&
         (!term->kbd_focus || term->conf->bell.command_focused))

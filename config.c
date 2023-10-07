@@ -1031,7 +1031,7 @@ parse_section_bell(struct context *ctx)
         return value_to_bool(ctx, &conf->bell.urgent);
     else if (strcmp(key, "notify") == 0)
         return value_to_bool(ctx, &conf->bell.notify);
-    else if (strcmp(key, "flash") == 0)
+    else if (strcmp(key, "visual") == 0)
         return value_to_bool(ctx, &conf->bell.flash);
     else if (strcmp(key, "command") == 0)
         return value_to_spawn_template(ctx, &conf->bell.command);
@@ -1300,7 +1300,7 @@ parse_section_colors(struct context *ctx)
         return true;
     }
 
-    else if (strcmp(key, "flash_alpha") == 0) {
+    else if (strcmp(key, "flash-alpha") == 0) {
         float alpha;
         if (!value_to_float(ctx, &alpha))
             return false;
