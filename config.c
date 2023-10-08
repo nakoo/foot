@@ -101,6 +101,10 @@ static const char *const binding_action_map[] = {
     [BIND_ACTION_CLIPBOARD_PASTE] = "clipboard-paste",
     [BIND_ACTION_PRIMARY_PASTE] = "primary-paste",
     [BIND_ACTION_SEARCH_START] = "search-start",
+    [BIND_ACTION_CROSSHAIR] = "crosshair",
+    [BIND_ACTION_CROSSHAIR_FIX_POSITION] = "crosshair-fix-position",
+    [BIND_ACTION_CROSSHAIR_PIXEL_POSITION] = "crosshair-use-pixel-position",
+    [BIND_ACTION_CROSSHAIR_MOUSE_POSITION] = "crosshair-use-mouse-position",
     [BIND_ACTION_FONT_SIZE_UP] = "font-increase",
     [BIND_ACTION_FONT_SIZE_DOWN] = "font-decrease",
     [BIND_ACTION_FONT_SIZE_RESET] = "font-reset",
@@ -1252,6 +1256,7 @@ parse_section_colors(struct context *ctx)
     }
 
     else if (strcmp(key, "flash") == 0) color = &conf->colors.flash;
+    else if (strcmp(key, "crosshair") == 0) color = &conf->colors.crosshair;
     else if (strcmp(key, "foreground") == 0) color = &conf->colors.fg;
     else if (strcmp(key, "background") == 0) color = &conf->colors.bg;
     else if (strcmp(key, "selection-foreground") == 0) color = &conf->colors.selection_fg;
@@ -1349,6 +1354,19 @@ parse_section_colors(struct context *ctx)
         return true;
     }
 
+    else if (strcmp(key, "crosshair-alpha") == 0) {
+        float alpha;
+        if (!value_to_float(ctx, &alpha))
+            return false;
+
+        if (alpha < 0. || alpha > 1.) {
+            LOG_CONTEXTUAL_ERR("not in range 0.0-1.0");
+            return false;
+        }
+
+        conf->colors.crosshair_alpha = alpha * 65535.;
+        return true;
+    }
 
     else {
         LOG_CONTEXTUAL_ERR("not valid option");
@@ -2846,6 +2864,10 @@ add_default_key_bindings(struct config *conf)
         {BIND_ACTION_CLIPBOARD_PASTE, m_none, {{XKB_KEY_XF86Paste}}},
         {BIND_ACTION_PRIMARY_PASTE, m_shift, {{XKB_KEY_Insert}}},
         {BIND_ACTION_SEARCH_START, m_ctrl_shift, {{XKB_KEY_r}}},
+        {BIND_ACTION_CROSSHAIR, m_ctrl_shift, {{XKB_KEY_i}}},
+        {BIND_ACTION_CROSSHAIR_FIX_POSITION, m_ctrl_shift, {{XKB_KEY_f}}},
+        {BIND_ACTION_CROSSHAIR_MOUSE_POSITION, m_ctrl_shift, {{XKB_KEY_m}}},
+        {BIND_ACTION_CROSSHAIR_PIXEL_POSITION, m_ctrl_shift, {{XKB_KEY_p}}},
         {BIND_ACTION_FONT_SIZE_UP, m_ctrl, {{XKB_KEY_plus}}},
         {BIND_ACTION_FONT_SIZE_UP, m_ctrl, {{XKB_KEY_equal}}},
         {BIND_ACTION_FONT_SIZE_UP, m_ctrl, {{XKB_KEY_KP_Add}}},
@@ -3036,6 +3058,8 @@ config_load(struct config *conf, const char *conf_path,
             .bg = default_background,
             .flash = 0x7f7f00,
             .flash_alpha = 0x7fff,
+            .crosshair = default_foreground,
+            .crosshair_alpha = 0xffff,
             .alpha = 0xffff,
             .selection_fg = 0x80000000,  /* Use default bg */
             .selection_bg = 0x80000000,  /* Use default fg */
@@ -3077,7 +3101,6 @@ config_load(struct config *conf, const char *conf_path,
             .border_width_visible = 0,
             .button_width = 26,
         },
-
         .render_worker_count = sysconf(_SC_NPROCESSORS_ONLN),
         .server_socket_path = get_server_socket_path(),
         .presentation_timings = false,

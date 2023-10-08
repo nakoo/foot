@@ -1172,8 +1172,6 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         .colors = {
             .fg = conf->colors.fg,
             .bg = conf->colors.bg,
-            .flash = conf->colors.flash,
-            .flash_alpha = conf->colors.flash_alpha,
             .alpha = conf->colors.alpha,
             .selection_fg = conf->colors.selection_fg,
             .selection_bg = conf->colors.selection_bg,
@@ -1215,6 +1213,10 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         },
         .num_lock_modifier = true,
         .bell_action_enabled = true,
+        .crosshair.active = false,
+        .crosshair.position_fixed = false,
+        .crosshair.use_mouse_position = false,
+        .crosshair.use_mouse_pixel_coordinates = false,
         .tab_stops = tll_init(),
         .wl = wayl,
         .render = {
@@ -1926,9 +1928,7 @@ term_reset(struct terminal *term, bool hard)
     fdm_del(term->fdm, term->blink.fd); term->blink.fd = -1;
     term->colors.fg = term->conf->colors.fg;
     term->colors.bg = term->conf->colors.bg;
-    term->colors.flash = term->conf->colors.flash;
     term->colors.alpha = term->conf->colors.alpha;
-    term->colors.flash_alpha = term->conf->colors.flash_alpha;
     term->colors.selection_fg = term->conf->colors.selection_fg;
     term->colors.selection_bg = term->conf->colors.selection_bg;
     term->colors.use_custom_selection = term->conf->colors.use_custom.selection;
@@ -1968,6 +1968,12 @@ term_reset(struct terminal *term, bool hard)
     }
     term->normal.cur_row = term->normal.rows[0];
     term->alt.cur_row = term->alt.rows[0];
+
+    term->crosshair.active = false;
+    term->crosshair.position_fixed = false;
+    term->crosshair.use_mouse_position = false;
+    term->crosshair.use_mouse_pixel_coordinates = false;
+
     tll_free(term->normal.scroll_damage);
     tll_free(term->alt.scroll_damage);
     term->render.last_cursor.row = NULL;

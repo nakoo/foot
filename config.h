@@ -204,7 +204,9 @@ struct config {
         uint32_t fg;
         uint32_t bg;
         uint32_t flash;
-        uint32_t flash_alpha;
+        uint16_t flash_alpha;
+        uint32_t crosshair;
+        uint16_t crosshair_alpha;
         uint32_t table[256];
         uint16_t alpha;
         uint32_t selection_fg;

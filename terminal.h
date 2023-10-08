@@ -332,6 +332,7 @@ enum overlay_style {
     OVERLAY_SEARCH,
     OVERLAY_FLASH,
     OVERLAY_UNICODE_MODE,
+    OVERLAY_CROSSHAIR,
 };
 
 typedef tll(struct ptmx_buffer) ptmx_buffer_list_t;
@@ -509,8 +510,6 @@ struct terminal {
     struct {
         uint32_t fg;
         uint32_t bg;
-        uint32_t flash;
-        uint32_t flash_alpha;
         uint32_t table[256];
         uint16_t alpha;
         uint32_t selection_fg;
@@ -563,6 +562,13 @@ struct terminal {
             size_t len;
         } last;
     } search;
+
+    struct {
+        bool active;
+        bool position_fixed;
+        bool use_mouse_position;
+        bool use_mouse_pixel_coordinates;
+    } crosshair;
 
     struct wayland *wl;
     struct wl_window *window;
@@ -636,6 +642,13 @@ struct terminal {
         enum overlay_style last_overlay_style;
         struct buffer *last_overlay_buf;
         pixman_region32_t last_overlay_clip;
+
+        struct {
+            int row;
+            int col;
+            int mouse_x;
+            int mouse_y;
+        } last_crosshair;
 
         size_t search_glyph_offset;
 

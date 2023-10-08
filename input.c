@@ -186,6 +186,22 @@ execute_binding(struct seat *seat, struct terminal *term,
         search_begin(term);
         return true;
 
+    case BIND_ACTION_CROSSHAIR:
+        term->crosshair.active = !term->crosshair.active;
+        return true;
+
+    case BIND_ACTION_CROSSHAIR_FIX_POSITION:
+        term->crosshair.position_fixed = !term->crosshair.position_fixed;
+        return true;
+
+    case BIND_ACTION_CROSSHAIR_MOUSE_POSITION:
+        term->crosshair.use_mouse_position = !term->crosshair.use_mouse_position;
+        return true;
+
+    case BIND_ACTION_CROSSHAIR_PIXEL_POSITION:
+        term->crosshair.use_mouse_pixel_coordinates = !term->crosshair.use_mouse_pixel_coordinates;
+        return true;
+
     case BIND_ACTION_FONT_SIZE_UP:
         term_font_size_increase(term);
         return true;
@@ -429,7 +445,7 @@ execute_binding(struct seat *seat, struct terminal *term,
 
             term_damage_view(term);
             render_refresh(term);
-            break; 
+            break;
         }
 
         return true;

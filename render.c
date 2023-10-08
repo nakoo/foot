@@ -362,6 +362,7 @@ draw_underline_cursor(const struct terminal *term, pixman_image_t *pix,
         PIXMAN_OP_SRC, pix, color,
         1, &(pixman_rectangle16_t){
             x, y + y_ofs, cols * term->cell_width, thickness});
+
 }
 
 static void
@@ -1565,6 +1566,7 @@ render_overlay(struct terminal *term)
         term->is_searching ? OVERLAY_SEARCH :
         term->flash.active ? OVERLAY_FLASH :
         unicode_mode_active ? OVERLAY_UNICODE_MODE :
+        term->crosshair.active ? OVERLAY_CROSSHAIR :
         OVERLAY_NONE;
 
     if (likely(style == OVERLAY_NONE)) {
@@ -1581,6 +1583,7 @@ render_overlay(struct terminal *term)
         }
         return;
     }
+
 
     struct buffer *buf = shm_get_buffer(
         term->render.chains.overlay, term->width, term->height);
@@ -1603,6 +1606,13 @@ render_overlay(struct terminal *term)
                 term->conf->colors.flash,
                 term->conf->colors.flash_alpha);
         break;
+
+    case OVERLAY_CROSSHAIR:
+        color = color_hex_to_pixman_with_alpha(
+                term->conf->colors.crosshair,
+                term->conf->colors.crosshair_alpha);
+        break;
+
     }
 
     /* Bounding rectangle of damaged areas - for wl_surface_damage_buffer() */
@@ -1725,7 +1735,8 @@ render_overlay(struct terminal *term)
     }
 
     else if (buf == term->render.last_overlay_buf &&
-             style == term->render.last_overlay_style)
+             style == term->render.last_overlay_style &&
+             style != OVERLAY_CROSSHAIR)
     {
         xassert(style == OVERLAY_FLASH || style == OVERLAY_UNICODE_MODE);
         shm_did_not_use_buf(buf);
@@ -1735,9 +1746,78 @@ render_overlay(struct terminal *term)
         damage_bounds = (pixman_box32_t){0, 0, buf->width, buf->height};
     }
 
-    pixman_image_fill_rectangles(
-        PIXMAN_OP_SRC, buf->pix[0], &color, 1,
-        &(pixman_rectangle16_t){0, 0, term->width, term->height});
+
+    if (style == OVERLAY_CROSSHAIR) {
+        int cursor_row = term->grid->cursor.point.row;
+        int cursor_col = term->grid->cursor.point.col;
+        int mouse_x = 0;
+        int mouse_y = 0;
+
+        tll_foreach(term->wl->seats, it) {
+            if (it->item.kbd_focus == term) {
+                if (it->item.pointer.hidden == 0 &&
+                        term->crosshair.use_mouse_position == true) {
+
+                    cursor_row = it->item.mouse.row > 0 ? it->item.mouse.row : 0;
+                    cursor_col = it->item.mouse.col > 0 ? it->item.mouse.col : 0;
+                    mouse_x = it->item.mouse.x;
+                    mouse_y = it->item.mouse.y;
+                    break;
+                }
+            }
+        }
+
+        if (term->crosshair.position_fixed == true) {
+            cursor_row = term->render.last_crosshair.row;
+            cursor_col = term->render.last_crosshair.col;
+            mouse_x = term->render.last_crosshair.mouse_x;
+            mouse_y = term->render.last_crosshair.mouse_y;
+        }
+
+        pixman_image_fill_rectangles(
+            PIXMAN_OP_SRC, buf->pix[0], &(pixman_color_t){0}, 1,
+            &(pixman_rectangle16_t){0, 0, term->width, term->height});
+
+        if (term->crosshair.use_mouse_pixel_coordinates == false) {
+            int y  = term->margins.top + (cursor_row * term->cell_height) + term->cell_height;
+            int y2 = 1; // --FIXME-- maybe define crosshair thickness?
+
+            if (y + y2 > term->height)
+                y = term->height - 1;
+
+            pixman_image_fill_rectangles(
+                PIXMAN_OP_SRC, buf->pix[0], &color, 1,
+                &(pixman_rectangle16_t){term->margins.left, y, term->width, y2} );
+
+            pixman_image_fill_rectangles(
+                PIXMAN_OP_SRC, buf->pix[0], &color, 1,
+                &(pixman_rectangle16_t){term->margins.left + (cursor_col * term->cell_width),
+                term->margins.top, 1, term->height} );
+
+        } else {
+            if (mouse_x > 0 || mouse_y > 0) {
+                pixman_image_fill_rectangles(
+                    PIXMAN_OP_SRC, buf->pix[0], &color, 1,
+                    &(pixman_rectangle16_t){term->margins.left, mouse_y, term->width, 1} );
+
+                pixman_image_fill_rectangles(
+                    PIXMAN_OP_SRC, buf->pix[0], &color, 1,
+                    &(pixman_rectangle16_t){mouse_x, term->margins.top, 1, term->height} );
+            }
+        }
+
+        if (term->crosshair.position_fixed == false) {
+            term->render.last_crosshair.row = cursor_row;
+            term->render.last_crosshair.col = cursor_col;
+            term->render.last_crosshair.mouse_x = mouse_x;
+            term->render.last_crosshair.mouse_y = mouse_y;
+        }
+
+    } else {
+        pixman_image_fill_rectangles(
+            PIXMAN_OP_SRC, buf->pix[0], &color, 1,
+            &(pixman_rectangle16_t){0, 0, term->width, term->height});
+    }
 
     quirk_weston_subsurface_desync_on(overlay->sub);
     wayl_surface_scale(
@@ -2234,7 +2314,7 @@ render_csd_button_maximize_window(
     pixman_image_fill_rectangles(
         PIXMAN_OP_SRC, buf->pix[0], &color, 4,
         (pixman_rectangle16_t[]) {
-            {x_margin, y_margin, width, thick},
+            { x_margin, y_margin, width, thick },
             { x_margin, y_margin + thick, thick, width - 2 * thick },
             { x_margin + width - thick, y_margin + thick, thick, width - 2 * thick },
             { x_margin, y_margin + width - thick, width, thick }

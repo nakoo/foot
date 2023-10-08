@@ -625,6 +625,13 @@ can configure the background transparency with the _alpha_ option.
 
 	Default: _0.5_.
 
+*crosshair*
+	Color to use for the crosshair cursor.
+
+*crosshair-alpha*
+	Crosshair translucency. A value in the range 0.0-1.0, where 0.0
+	means completely transparent, and 1.0 is opaque.
+
 *alpha*
 	Background translucency. A value in the range 0.0-1.0, where 0.0
 	means completely transparent, and 1.0 is opaque. Default: _1.0_.
@@ -905,6 +912,41 @@ e.g. *search-start=none*.
 	etc is by using an IME.
 	
 	Default: _Control+Shift+u_.
+
+*crosshair*
+	Activates a crosshair on the current cursor position. Helps to
+	line up horizontal and vertical lines.
+
+	Default: _Control+Shift+i_.
+
+*crosshair-fix-position*
+	A toggle switch to freeze the crosshair to the current cursor
+	location. The location is remembered even if the crosshair is
+	deactivated. Press the keyboard combination again to unfreeze
+	the crosshair.
+
+	Default: _Control+Shift+f_.
+
+*crosshair-use-mouse-position*
+	By default the crosshair uses the current text cursor position.
+	This keybinding activates the mouse cursor position instead. If
+	the mouse option *hide-when-typing* is active, once the mouse
+	cursor is hidden by starting to type, the crosshair falls back to
+	the text cursor. This can be used for example to quickly check an
+	alignment on another part of the screen. To have the crosshair
+	remain on the new position use the *crosshair-fix-position* 
+	keybinding. 
+
+	The crosshair will be drawn at the cursor row and column the mouse
+	cursor points to.
+
+	Default: _Control+Shift+m_.
+
+*crosshair-use-pixel-position*
+	Activates pixel precision for the crosshair when
+	*crosshair-use-mouse-position* is used.
+
+	Default: _Control+Shift+p_.
 
 # SECTION: search-bindings
 
