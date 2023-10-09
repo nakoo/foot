@@ -576,6 +576,27 @@ render_cell(struct terminal *term, pixman_image_t *pix, pixman_region32_t *damag
                 alpha = term->colors.alpha;
             }
         }
+
+        if (!term->window->is_fullscreen) {
+            switch (term->conf->alpha_mode) {
+                case ALPHA_MODE_DEFAULT: {
+                    if (cell->attrs.bg_src == COLOR_DEFAULT) {
+                        alpha = term->colors.alpha;
+                    }
+                    break;
+                }
+                case ALPHA_MODE_MATCHING: {
+                    if (cell->attrs.bg == term->colors.bg) {
+                        alpha = term->colors.alpha;
+                    }
+                    break;
+                }
+                case ALPHA_MODE_ALL: {
+                    alpha = term->colors.alpha;
+                    break;
+                }
+            }
+        }
     }
 
     if (unlikely(is_selected && _fg == _bg)) {

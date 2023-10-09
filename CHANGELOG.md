@@ -263,6 +263,9 @@
 
 ### Added
 
+* `alpha_mode` option to `foot.ini`. Defaults to `default`. This
+  config changes how alpha is handled on background colours not set by
+  the terminal.(e.g. vim) ([#1510](1510))
 * Support for building with _wayland-protocols_ as a subproject.
 * Mouse wheel scrolls can now be used in `mouse-bindings`
   ([#1077][1077]).

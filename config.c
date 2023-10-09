@@ -1055,6 +1055,15 @@ parse_section_main(struct context *ctx)
         return true;
     }
 
+    else if (strcmp(key, "alpha_mode") == 0) {
+        _Static_assert(sizeof(conf->alpha_mode) == sizeof(int),
+        "enum is not 32-bit");
+        return value_to_enum(
+            ctx,
+            (const char *[]){"default", "matching", "all", NULL},
+            (int *)&conf->alpha_mode);
+    }
+
     else {
         LOG_CONTEXTUAL_ERR("not a valid option: %s", key);
         return false;
@@ -3083,6 +3092,7 @@ config_load(struct config *conf, const char *conf_path,
             },
             .multiplier = 3.,
         },
+        .alpha_mode = ALPHA_MODE_DEFAULT,
         .colors = {
             .fg = default_foreground,
             .bg = default_background,
