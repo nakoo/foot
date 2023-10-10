@@ -478,7 +478,6 @@ struct terminal {
     char *window_title;
     tll(char *) window_title_stack;
     char *app_id;
-    struct timespec app_id_last_update;
 
     struct {
         bool active;
@@ -602,6 +601,11 @@ struct terminal {
             bool is_armed;
             int timer_fd;
         } title;
+
+        struct {
+            struct timespec last_update;
+            int timer_fd;
+        } app_id;
 
         uint32_t scrollback_lines; /* Number of scrollback lines, from conf (TODO: move out from render struct?) */
 

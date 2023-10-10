@@ -629,6 +629,30 @@ fdm_title_update_timeout(struct fdm *fdm, int fd, int events, void *data)
 }
 
 static bool
+fdm_app_id_update_timeout(struct fdm *fdm, int fd, int events, void *data)
+{
+    if (events & EPOLLHUP)
+        return false;
+
+    struct terminal *term = data;
+    uint64_t unused;
+    ssize_t ret = read(term->render.app_id.timer_fd, &unused, sizeof(unused));
+
+    if (ret < 0) {
+        if (errno == EAGAIN)
+            return true;
+        LOG_ERRNO("failed to read app ID update throttle timer");
+        return false;
+    }
+
+    struct itimerspec reset = {{0}};
+    timerfd_settime(term->render.app_id.timer_fd, 0, &reset, NULL);
+
+    render_refresh_app_id(term);
+    return true;
+}
+
+static bool
 initialize_render_workers(struct terminal *term)
 {
     LOG_INFO("using %hu rendering threads", term->render.workers.count);
@@ -1068,6 +1092,7 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
     int delay_upper_fd = -1;
     int app_sync_updates_fd = -1;
     int title_update_fd = -1;
+    int app_id_update_fd = -1;
 
     struct terminal *term = malloc(sizeof(*term));
     if (unlikely(term == NULL)) {
@@ -1102,6 +1127,12 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         goto close_fds;
     }
 
+    if ((app_id_update_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK)) < 0)
+    {
+        LOG_ERRNO("failed to create app ID update throttle timer FD");
+        goto close_fds;
+    }
+
     if (ioctl(ptmx, (unsigned int)TIOCSWINSZ,
               &(struct winsize){.ws_row = 24, .ws_col = 80}) < 0)
     {
@@ -1132,7 +1163,8 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         !fdm_add(fdm, delay_lower_fd, EPOLLIN, &fdm_delayed_render, term) ||
         !fdm_add(fdm, delay_upper_fd, EPOLLIN, &fdm_delayed_render, term) ||
         !fdm_add(fdm, app_sync_updates_fd, EPOLLIN, &fdm_app_sync_updates_timeout, term) ||
-        !fdm_add(fdm, title_update_fd, EPOLLIN, &fdm_title_update_timeout, term))
+        !fdm_add(fdm, title_update_fd, EPOLLIN, &fdm_title_update_timeout, term) ||
+        !fdm_add(fdm, app_id_update_fd, EPOLLIN, &fdm_app_id_update_timeout, term))
     {
         goto err;
     }
@@ -1228,6 +1260,9 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
             .title = {
                 .is_armed = false,
                 .timer_fd = title_update_fd,
+            },
+            .app_id = {
+                .timer_fd = app_id_update_fd,
             },
             .workers = {
                 .count = conf->render_worker_count,
@@ -1336,6 +1371,7 @@ close_fds:
     fdm_del(fdm, delay_upper_fd);
     fdm_del(fdm, app_sync_updates_fd);
     fdm_del(fdm, title_update_fd);
+    fdm_del(fdm, app_id_update_fd);
 
     free(term);
     return NULL;
@@ -1528,6 +1564,7 @@ term_shutdown(struct terminal *term)
 
     fdm_del(term->fdm, term->selection.auto_scroll.fd);
     fdm_del(term->fdm, term->render.app_sync_updates.timer_fd);
+    fdm_del(term->fdm, term->render.app_id.timer_fd);
     fdm_del(term->fdm, term->render.title.timer_fd);
     fdm_del(term->fdm, term->delayed_render_timer.lower_fd);
     fdm_del(term->fdm, term->delayed_render_timer.upper_fd);
@@ -1566,6 +1603,7 @@ term_shutdown(struct terminal *term)
 
     term->selection.auto_scroll.fd = -1;
     term->render.app_sync_updates.timer_fd = -1;
+    term->render.app_id.timer_fd = -1;
     term->render.title.timer_fd = -1;
     term->delayed_render_timer.lower_fd = -1;
     term->delayed_render_timer.upper_fd = -1;
@@ -1619,6 +1657,7 @@ term_destroy(struct terminal *term)
 
     fdm_del(term->fdm, term->selection.auto_scroll.fd);
     fdm_del(term->fdm, term->render.app_sync_updates.timer_fd);
+    fdm_del(term->fdm, term->render.app_id.timer_fd);
     fdm_del(term->fdm, term->render.title.timer_fd);
     fdm_del(term->fdm, term->delayed_render_timer.lower_fd);
     fdm_del(term->fdm, term->delayed_render_timer.upper_fd);
@@ -3257,22 +3296,13 @@ term_set_app_id(struct terminal *term, const char *app_id)
     if (term->app_id != NULL && app_id != NULL && strcmp(term->app_id, app_id) == 0)
         return;
 
-    struct timespec now;
-    if (clock_gettime(CLOCK_MONOTONIC, &now) < 0)
-        return;
-    struct timespec diff;
-    timespec_sub(&now, &term->app_id_last_update, &diff);
-    if (diff.tv_sec == 0 && diff.tv_nsec < 8333 * 1000)
-        return;
-    term->app_id_last_update = now;
-
     free(term->app_id);
     if (app_id != NULL) {
         term->app_id = xstrdup(app_id);
     } else {
         term->app_id = NULL;
     }
-    xdg_toplevel_set_app_id(term->window->xdg_toplevel, term->app_id ? term->app_id : term->conf->app_id);
+    render_refresh_app_id(term);
 }
 
 void
