@@ -1055,7 +1055,7 @@ parse_section_main(struct context *ctx)
         return true;
     }
 
-    else if (strcmp(key, "alpha_mode") == 0) {
+    else if (strcmp(key, "alpha-mode") == 0) {
         _Static_assert(sizeof(conf->alpha_mode) == sizeof(int),
         "enum is not 32-bit");
         return value_to_enum(
