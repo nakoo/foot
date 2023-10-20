@@ -77,7 +77,7 @@ add_project_arguments(
     ['-pedantic',
      '-fstrict-aliasing',
      '-Wstrict-aliasing']) +
-  (get_option('ext-underline')
+  (get_option('ext-underline').enabled()
     ? ['-DFOOT_EXT_UNDERLINE=1']
     : ['-DFOOT_EXT_UNDERLINE=0']),
   language: 'c',
