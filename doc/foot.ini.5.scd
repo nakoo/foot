@@ -909,10 +909,9 @@ e.g. *search-start=none*.
 	Default: _Control+Shift+i_.
 
 *crosshair-fix-position*
-	A toggle switch to freeze the crosshair to the current cursor
-	location. The location is remembered even if the crosshair is
-	deactivated. Press the keyboard combination again to unfreeze
-	the crosshair.
+	A toggle switch to freeze the crosshair on the current location.
+	The location is remembered even if the crosshair is deactivated.
+	Press the keyboard combination again to unfreeze the crosshair.
 
 	Default: _Control+Shift+f_.
 
