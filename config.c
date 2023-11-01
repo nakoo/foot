@@ -3061,7 +3061,7 @@ config_load(struct config *conf, const char *conf_path,
             .flash = 0x7f7f00,
             .flash_alpha = 0x7fff,
             .crosshair = default_foreground,
-            .crosshair_alpha = 0xffff,
+            .crosshair_alpha = 0x7fff,
             .alpha = 0xffff,
             .selection_fg = 0x80000000,  /* Use default bg */
             .selection_bg = 0x80000000,  /* Use default fg */
