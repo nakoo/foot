@@ -29,7 +29,13 @@ struct font_size_adjustment {
 
 enum cursor_style { CURSOR_BLOCK, CURSOR_UNDERLINE, CURSOR_BEAM };
 
-enum conf_size_type {CONF_SIZE_PX, CONF_SIZE_CELLS};
+enum conf_size_type { CONF_SIZE_PX, CONF_SIZE_CELLS };
+
+enum crosshair_style {
+    CROSSHAIR_FULL,
+    CROSSHAIR_HORIZONTAL,
+    CROSSHAIR_VERTICAL
+};
 
 struct config_font {
     char *pattern;

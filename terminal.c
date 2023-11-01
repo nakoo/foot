@@ -1217,6 +1217,8 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         .crosshair.position_fixed = false,
         .crosshair.use_mouse_position = false,
         .crosshair.use_mouse_pixel_coordinates = false,
+        .crosshair.width = 1,
+        .crosshair.style = CROSSHAIR_FULL,
         .tab_stops = tll_init(),
         .wl = wayl,
         .render = {
@@ -1973,6 +1975,8 @@ term_reset(struct terminal *term, bool hard)
     term->crosshair.position_fixed = false;
     term->crosshair.use_mouse_position = false;
     term->crosshair.use_mouse_pixel_coordinates = false;
+    term->crosshair.width = 1;
+    term->crosshair.style = CROSSHAIR_FULL;
 
     tll_free(term->normal.scroll_damage);
     tll_free(term->alt.scroll_damage);

@@ -202,6 +202,26 @@ execute_binding(struct seat *seat, struct terminal *term,
         term->crosshair.use_mouse_pixel_coordinates = !term->crosshair.use_mouse_pixel_coordinates;
         return true;
 
+    case BIND_ACTION_CROSSHAIR_STYLE:
+        switch (term->crosshair.style) {
+            case CROSSHAIR_FULL:
+                term->crosshair.style =  CROSSHAIR_VERTICAL;
+                break;
+
+            case CROSSHAIR_VERTICAL:
+                term->crosshair.style =  CROSSHAIR_HORIZONTAL;
+                break;
+
+            case CROSSHAIR_HORIZONTAL:
+                term->crosshair.style =  CROSSHAIR_FULL;
+                break;
+
+            default:
+                BUG("Unhandled crosshair style");
+                break;
+        }
+        return true;
+
     case BIND_ACTION_FONT_SIZE_UP:
         term_font_size_increase(term);
         return true;

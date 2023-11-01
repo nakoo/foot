@@ -948,6 +948,12 @@ e.g. *search-start=none*.
 
 	Default: _Control+Shift+p_.
 
+*crosshair-style*
+	A toggle to switch the style from full cross to vertical line to
+	horizontal line and back to full cross.
+
+	Default: _Control+Shfit+s_.
+
 # SECTION: search-bindings
 
 This section lets you override the default key bindings used in

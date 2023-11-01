@@ -564,10 +564,12 @@ struct terminal {
     } search;
 
     struct {
+        int width;
         bool active;
         bool position_fixed;
         bool use_mouse_position;
         bool use_mouse_pixel_coordinates;
+        enum crosshair_style style;
     } crosshair;
 
     struct wayland *wl;

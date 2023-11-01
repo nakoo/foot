@@ -1746,17 +1746,18 @@ render_overlay(struct terminal *term)
         damage_bounds = (pixman_box32_t){0, 0, buf->width, buf->height};
     }
 
-
     if (style == OVERLAY_CROSSHAIR) {
         int cursor_row = term->grid->cursor.point.row;
         int cursor_col = term->grid->cursor.point.col;
         int mouse_x = 0;
         int mouse_y = 0;
+        int y = 0;
+        int x = 0;
 
         tll_foreach(term->wl->seats, it) {
             if (it->item.kbd_focus == term) {
                 if (it->item.pointer.hidden == 0 &&
-                        term->crosshair.use_mouse_position == true) {
+                    term->crosshair.use_mouse_position == true) {
 
                     cursor_row = it->item.mouse.row > 0 ? it->item.mouse.row : 0;
                     cursor_col = it->item.mouse.col > 0 ? it->item.mouse.col : 0;
@@ -1779,32 +1780,27 @@ render_overlay(struct terminal *term)
             &(pixman_rectangle16_t){0, 0, term->width, term->height});
 
         if (term->crosshair.use_mouse_pixel_coordinates == false) {
-            int y  = term->margins.top + (cursor_row * term->cell_height) + term->cell_height;
-            int y2 = 1; // --FIXME-- maybe define crosshair thickness?
+            y = min(term->margins.top + (cursor_row * term->cell_height) + term->cell_height,
+                    term->height - term->crosshair.width);
 
-            if (y + y2 > term->height)
-                y = term->height - 1;
-
-            pixman_image_fill_rectangles(
-                PIXMAN_OP_SRC, buf->pix[0], &color, 1,
-                &(pixman_rectangle16_t){term->margins.left, y, term->width, y2} );
-
-            pixman_image_fill_rectangles(
-                PIXMAN_OP_SRC, buf->pix[0], &color, 1,
-                &(pixman_rectangle16_t){term->margins.left + (cursor_col * term->cell_width),
-                term->margins.top, 1, term->height} );
-
+            x = min(term->margins.left + (cursor_col * term->cell_width),
+                    term->width - term->crosshair.width);
         } else {
-            if (mouse_x > 0 || mouse_y > 0) {
-                pixman_image_fill_rectangles(
-                    PIXMAN_OP_SRC, buf->pix[0], &color, 1,
-                    &(pixman_rectangle16_t){term->margins.left, mouse_y, term->width, 1} );
-
-                pixman_image_fill_rectangles(
-                    PIXMAN_OP_SRC, buf->pix[0], &color, 1,
-                    &(pixman_rectangle16_t){mouse_x, term->margins.top, 1, term->height} );
-            }
+            y = max(min(mouse_y, term->height - term->crosshair.width), 1);
+            x = max(min(mouse_x, term->width - term->crosshair.width), 1);
         }
+
+        if (term->crosshair.style == CROSSHAIR_FULL ||
+            term->crosshair.style == CROSSHAIR_HORIZONTAL)
+            pixman_image_fill_rectangles(
+                PIXMAN_OP_SRC, buf->pix[0], &color, 1,
+                &(pixman_rectangle16_t){term->margins.left, y, term->width, term->crosshair.width});
+
+        if (term->crosshair.style == CROSSHAIR_FULL ||
+            term->crosshair.style == CROSSHAIR_VERTICAL)
+            pixman_image_fill_rectangles(
+                PIXMAN_OP_SRC, buf->pix[0], &color, 1,
+                &(pixman_rectangle16_t){x, term->margins.top, term->crosshair.width, term->height});
 
         if (term->crosshair.position_fixed == false) {
             term->render.last_crosshair.row = cursor_row;
