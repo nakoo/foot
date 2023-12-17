@@ -26,5 +26,5 @@ bright5=fae4fc
 bright6=89ddff
 bright7=ffffff
 
-# selection_background 28344a
-# selection_foreground none
+selection-background=28344a
+selection-foreground=a6accd
