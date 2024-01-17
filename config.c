@@ -921,6 +921,9 @@ parse_section_main(struct context *ctx)
     else if (strcmp(key, "resize-delay-ms") == 0)
         return value_to_uint16(ctx, 10, &conf->resize_delay_ms);
 
+    else if (strcmp(key, "resize-by-cells") == 0)
+        return value_to_bool(ctx, &conf->resize_by_cells);
+
     else if (strcmp(key, "bold-text-in-bright") == 0) {
         if (strcmp(value, "palette-based") == 0) {
             conf->bold_in_bright.enabled = true;
@@ -2990,6 +2993,7 @@ config_load(struct config *conf, const char *conf_path,
         },
         .pad_x = 0,
         .pad_y = 0,
+        .resize_by_cells = true,
         .resize_delay_ms = 100,
         .bold_in_bright = {
             .enabled = false,
