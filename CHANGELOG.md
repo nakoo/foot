@@ -91,6 +91,10 @@
 * Use XRGB pixel format (instead of ARGB) when there is no
   transparency.
 * Prefer CSS xcursor names, and fallback to legacy X11 names.
+* Sixels: text cursor is placed on the last row touched by the sixel,
+  instead of the row touch by the **upper** pixel of the last sixel
+  row. With this change, you **always** need **exactly** one newline
+  to print text _under_ the sixel.
 
 [1526]: https://codeberg.org/dnkl/foot/issues/1526
 [1528]: https://codeberg.org/dnkl/foot/issues/1528
