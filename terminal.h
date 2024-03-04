@@ -677,6 +677,7 @@ struct terminal {
             uint32_t *p;     /* Pointer into data, for current position */
             int width;       /* Image width, in pixels */
             int height;      /* Image height, in pixels */
+            int alloc_height;  /* Image height, in pixels, aligned to 6-pixel boundary */
         } image;
 
         /*
@@ -687,6 +688,7 @@ struct terminal {
          */
         int pan;
         int pad;
+        bool size_locked;
 
         bool scrolling:1;                 /* Private mode 80 */
         bool use_private_palette:1;       /* Private mode 1070 */

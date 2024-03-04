@@ -82,6 +82,7 @@ sixel_init(struct terminal *term, int p1, int p2, int p3)
     term->sixel.color_idx = 0;
     term->sixel.pan = pan;
     term->sixel.pad = pad;
+    term->sixel.size_locked = false;
     term->sixel.param = 0;
     term->sixel.param_idx = 0;
     memset(term->sixel.params, 0, sizeof(term->sixel.params));
@@ -90,6 +91,7 @@ sixel_init(struct terminal *term, int p1, int p2, int p3)
     term->sixel.image.p = NULL;
     term->sixel.image.width = 0;
     term->sixel.image.height = 0;
+    term->sixel.image.alloc_height = 0;
 
     if (term->sixel.use_private_palette) {
         xassert(term->sixel.private_palette == NULL);
@@ -1299,6 +1301,7 @@ sixel_unhook(struct terminal *term)
     term->sixel.image.p = NULL;
     term->sixel.image.width = 0;
     term->sixel.image.height = 0;
+    term->sixel.image.alloc_height = 0;
     term->sixel.pos = (struct coord){0, 0};
 
     free(term->sixel.private_palette);
@@ -1314,6 +1317,9 @@ sixel_unhook(struct terminal *term)
 static void
 resize_horizontally(struct terminal *term, int new_width)
 {
+    if (likely(term->sixel.size_locked))
+        return;
+
     if (unlikely(new_width > term->sixel.max_width)) {
         LOG_WARN("maximum image dimensions exceeded, truncating");
         new_width = term->sixel.max_width;
@@ -1374,6 +1380,9 @@ resize_vertically(struct terminal *term, int new_height)
     LOG_DBG("resizing image vertically: (%d)x%d -> (%d)x%d",
             term->sixel.image.width, term->sixel.image.height,
             term->sixel.image.width, new_height);
+
+    if (likely(term->sixel.size_locked))
+        return false;
 
     if (unlikely(new_height > term->sixel.max_height)) {
         LOG_WARN("maximum image dimensions reached");
@@ -1493,6 +1502,7 @@ resize(struct terminal *term, int new_width, int new_height)
     term->sixel.image.width = new_width;
     term->sixel.image.height = new_height;
     term->sixel.image.p = &term->sixel.image.data[term->sixel.pos.row * new_width + term->sixel.pos.col];
+    term->sixel.image.alloc_height = alloc_new_height;
 
     return true;
 }
@@ -1663,7 +1673,7 @@ decsixel_generic(struct terminal *term, uint8_t c)
         term->sixel.pos.col = 0;
         term->sixel.image.p = &term->sixel.image.data[term->sixel.pos.row * term->sixel.image.width];
 
-        if (term->sixel.pos.row >= term->sixel.image.height) {
+        if (unlikely(term->sixel.pos.row >= term->sixel.image.alloc_height)) {
             if (!resize_vertically(term, term->sixel.pos.row + 6 * term->sixel.pan))
                 term->sixel.pos.col = term->sixel.max_width + 1 * term->sixel.pad;
         }
@@ -1737,6 +1747,7 @@ decgra(struct terminal *term, uint8_t c)
             ph <= term->sixel.max_height && pv <= term->sixel.max_width)
         {
             resize(term, ph, pv);
+            term->sixel.size_locked = true;
         }
 
         term->sixel.state = SIXEL_DECSIXEL;

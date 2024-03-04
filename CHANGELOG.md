@@ -107,6 +107,9 @@
   determining whether a key combination produces text or not.
 * CSI-t queries now report pixel values **unscaled**, instead of
   **scaled** ([#1643][1643]).
+* Sixel "level 2" images (raster attributes set) are no longer
+  extended beyond the width/height specified in the raster attributes
+  ([#chafa-192][chafa-192]).
 
 [1526]: https://codeberg.org/dnkl/foot/issues/1526
 [1528]: https://codeberg.org/dnkl/foot/issues/1528
@@ -114,6 +117,7 @@
 [kitty-6913]: https://github.com/kovidgoyal/kitty/issues/6913
 [1584]: https://codeberg.org/dnkl/foot/issues/1584
 [1643]: https://codeberg.org/dnkl/foot/issues/1643
+[chafa-192]: https://github.com/hpjansson/chafa/issues/192
 
 
 ### Deprecated
