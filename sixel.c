@@ -1492,6 +1492,8 @@ sixel_add_ar_11(struct terminal *term, uint32_t *data, int stride, uint32_t colo
     xassert(term->sixel.pos.row < term->sixel.image.height);
     xassert(term->sixel.pan == 1);
 
+    if (data == NULL)
+        return;
     if (sixel & 0x01)
         *data = color;
     data += stride;
