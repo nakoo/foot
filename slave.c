@@ -406,8 +406,11 @@ slave_spawn(int ptmx, int argc, const char *cwd, char *const *argv,
         sigset_t mask;
         sigemptyset(&mask);
 
+        struct sigaction ign = {.sa_handler = SIG_IGN};
+        sigemptyset(&ign.sa_mask);
+
         if (sigprocmask(SIG_SETMASK, &mask, NULL) < 0 ||
-            sigaction(SIGHUP, &dfl, NULL) < 0 ||
+            sigaction(SIGHUP, &ign, NULL) < 0 ||
             sigaction(SIGPIPE, &dfl, NULL) < 0)
         {
             const int errno_copy = errno;
