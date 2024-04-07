@@ -2815,6 +2815,8 @@ term_scroll_partial(struct terminal *term, struct scroll_region region, int rows
     /* Verify scroll amount has been clamped */
     xassert(rows <= region.end - region.start);
 
+    bool expanded = term_expand_scrollback_capacity_if_needed(term, rows);
+
     /* Cancel selections that cannot be scrolled */
     if (unlikely(term->selection.coords.end.row >= 0)) {
         /*
@@ -2838,7 +2840,13 @@ term_scroll_partial(struct terminal *term, struct scroll_region region, int rows
 
     bool view_follows = term->grid->view == term->grid->offset;
     term->grid->offset += rows;
-    term->grid->offset &= term->grid->num_rows - 1;
+    if (!expanded) {
+        /* Additional capacity was not allocated.
+         * Clamp down the offset and wrap it around
+         * so that old output lines are reused.
+         */
+        term->grid->offset &= term->grid->num_rows - 1;
+    }
 
     if (likely(view_follows)) {
         term_damage_scroll(term, DAMAGE_SCROLL, region, rows);
