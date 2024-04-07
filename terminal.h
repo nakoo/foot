@@ -370,6 +370,7 @@ struct terminal {
     int cols;   /* number of columns */
     int rows;   /* number of rows */
     struct scroll_region scroll_region;
+    bool unlimited_scrollback;
 
     struct charsets charsets;
     struct charsets saved_charsets; /* For save/restore cursor + attributes */

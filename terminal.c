@@ -1266,6 +1266,7 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
                 .queue = tll_init(),
             },
         },
+        .unlimited_scrollback = conf->scrollback.unlimited,
         .delayed_render_timer = {
             .is_armed = false,
             .lower_fd = delay_lower_fd,
