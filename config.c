@@ -1092,6 +1092,9 @@ parse_section_scrollback(struct context *ctx)
     if (streq(key, "lines"))
         return value_to_uint32(ctx, 10, &conf->scrollback.lines);
 
+    else if (streq(key, "unlimited"))
+        return value_to_bool(ctx, &conf->scrollback.unlimited);
+
     else if (streq(key, "indicator-position")) {
         _Static_assert(
             sizeof(conf->scrollback.indicator.position) == sizeof(int),

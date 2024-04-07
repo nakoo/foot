@@ -175,6 +175,7 @@ struct config {
 
     struct {
         uint32_t lines;
+        bool unlimited;
 
         struct {
             enum {
