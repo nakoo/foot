@@ -2783,6 +2783,29 @@ selection_on_bottom_region(const struct terminal *term,
         selection_on_rows(term, region.end, term->rows - 1);
 }
 
+bool
+term_would_overflow_scrollback(struct terminal *term, int new_rows)
+{
+    return term->grid->offset + new_rows >= term->grid->num_rows;
+}
+
+bool term_should_expand_scrollback(struct terminal *term, int new_rows)
+{
+    bool would_overflow = term_would_overflow_scrollback(term, new_rows);
+    return term->unlimited_scrollback && would_overflow;
+}
+
+bool
+term_expand_scrollback_capacity_if_needed(struct terminal *term, int new_rows)
+{
+    if (term_should_expand_scrollback(term, new_rows)) {
+        grid_expand_capacity(term->grid, new_rows, term->render.scrollback_lines);
+        return true;
+    }
+
+    return false;
+}
+
 void
 term_scroll_partial(struct terminal *term, struct scroll_region region, int rows)
 {
