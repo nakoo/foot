@@ -13,8 +13,10 @@
 #include "stride.h"
 #include "util.h"
 #include "xmalloc.h"
+#include "misc.h"
 
 #define TIME_REFLOW 0
+#define TIME_EXPAND 0
 
 /*
  * "sb" (scrollback relative) coordinates
@@ -672,6 +674,63 @@ tp_cmp(const void *_a, const void *_b)
 
     xassert(a->col == b->col);
     return 0;
+}
+
+void
+grid_expand_capacity(
+    struct grid *grid, int minimum, int scrollback_lines)
+{
+#if defined(TIME_EXPAND) && TIME_EXPAND
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    int old_row_capacity = grid->num_rows;
+#endif
+
+    const int new_row_capacity = 1 << (32 - __builtin_clz(grid->num_rows + minimum + scrollback_lines - 1));
+
+    LOG_INFO("grid: expanding capacity to %d", new_row_capacity);
+
+    struct row **new_rows = xcalloc(new_row_capacity, sizeof(*new_rows));
+
+    /* Copy the old grid's rows to the new grid.
+     * The new capacity was zero filled by xcalloc.
+     * Geometry is the same but capacity is higher.
+     * So there is no need to reflow its contents.
+     * No need to check for overflow here either
+     * since a calloc has been called with these
+     * same parameters before and it would have
+     * failed had an integer overflow occurred.
+     */
+    memcpy(new_rows, grid->rows, (grid->offset + 1) * sizeof(*grid->rows));
+
+    /* TODO: Figure out how to get rid of these allocations.
+     * Ensure the rows have been allocated before returning.
+     * The rows are supposed to be allocated on demand but
+     * too much code depends on them not being NULL,
+     * specifically the terminal scrolling code.
+     */
+    for (int i = grid->offset + 1; i < new_row_capacity; i++) {
+        new_rows[i] = grid_row_alloc(grid->num_cols, true);
+    }
+
+    free(grid->rows);
+
+    grid->rows = new_rows;
+    grid->num_rows = new_row_capacity;
+
+#if defined(TIME_EXPAND) && TIME_EXPAND
+    struct timespec stop;
+    clock_gettime(CLOCK_MONOTONIC, &stop);
+
+    struct timespec diff;
+    timespec_sub(&stop, &start, &diff);
+
+    LOG_INFO("expanded grid capacity, %d -> %d rows in %lds %ldns",
+             old_row_capacity, new_row_capacity,
+             (long) diff.tv_sec,
+             diff.tv_nsec);
+#endif
 }
 
 void

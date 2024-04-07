@@ -11,6 +11,10 @@ void grid_swap_row(struct grid *grid, int row_a, int row_b);
 struct row *grid_row_alloc(int cols, bool initialize);
 void grid_row_free(struct row *row);
 
+void grid_expand_capacity(
+    struct grid *grid, int minimum,
+    int scrollback_lines);
+
 void grid_resize_without_reflow(
     struct grid *grid, int new_rows, int new_cols,
     int old_screen_rows, int new_screen_rows);
