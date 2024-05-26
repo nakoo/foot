@@ -2868,7 +2868,7 @@ parse_config_file(FILE *f, struct config *conf, const char *path, bool errors_ar
         errno = 0;
     }
 
-    /* Set `alpha_non_whitespace` to atleast `alpha`. */
+    /* Set `alpha_non_whitespace` to at least `alpha`. */
     conf->colors.alpha_non_whitespace = max(conf->colors.alpha_non_whitespace, conf->colors.alpha);
 
     if (errno != 0) {
@@ -3111,7 +3111,7 @@ config_load(struct config *conf, const char *conf_path,
             .alpha = 0xffff,
             /* HACK:
              * when `alpha_non_whitespace` is not set its
-             * default value will be `alpha`. This is achived via
+             * default value will be `alpha`. This is achieved via
              * restricting it to be at least the value of `alpha`
              */
             .alpha_non_whitespace = 0x0000,
