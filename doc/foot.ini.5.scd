@@ -647,6 +647,12 @@ can configure the background transparency with the _alpha_ option.
 	Background translucency. A value in the range 0.0-1.0, where 0.0
 	means completely transparent, and 1.0 is opaque. Default: _1.0_.
 
+*alpha-non-whitespace*
+	Background translucency for non whitespace characters.
+	A value in the range 0.0-1.0, where 0.0 means completely
+	transparent, and 1.0 is opaque. Default: The value of 0.0.
+	If this value is lower than _alpha_, _alpha_ will be used instead.
+
 *selection-foreground*, *selection-background*
 	Foreground (text) and background color to use in selected
 	text. Note that *both* options must be set, or the default will be

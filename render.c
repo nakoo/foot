@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <wctype.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <signal.h>
 
@@ -572,8 +573,10 @@ render_cell(struct terminal *term, pixman_image_t *pix, pixman_region32_t *damag
                  * NOTE: if changing this, also update render_margin()
                  */
                 xassert(alpha == 0xffff);
-            } else {
+            } else if (isspace(cell->wc) || cell->wc == 0) {
                 alpha = term->colors.alpha;
+            } else {
+                alpha = term->colors.alpha_non_whitespace;
             }
         }
     }

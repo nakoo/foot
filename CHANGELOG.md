@@ -60,6 +60,8 @@
 * Support for `wp_single_pixel_buffer_v1`; certain overlay surfaces
   will now utilize the new single-pixel buffer protocol. This mainly
   reduces the memory usage, but should also be slightly faster.
+* `alpha-non-whitespace` option, allowing for adjustment of
+  transparency only for non whitespace characters.
 
 [1707]: https://codeberg.org/dnkl/foot/issues/1707
 

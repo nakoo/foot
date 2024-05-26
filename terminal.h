@@ -516,6 +516,7 @@ struct terminal {
         uint32_t bg;
         uint32_t table[256];
         uint16_t alpha;
+        uint16_t alpha_non_whitespace;
         uint32_t selection_fg;
         uint32_t selection_bg;
         bool use_custom_selection;

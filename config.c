@@ -1340,6 +1340,20 @@ parse_section_colors(struct context *ctx)
         return true;
     }
 
+    else if (streq(key, "alpha-non-whitespace")) {
+        float alpha;
+        if (!value_to_float(ctx, &alpha))
+            return false;
+
+        if (alpha < 0. || alpha > 1.) {
+            LOG_CONTEXTUAL_ERR("not in range 0.0-1.0");
+            return false;
+        }
+
+        conf->colors.alpha_non_whitespace = alpha * 65535.;
+        return true;
+    }
+
     else if (streq(key, "flash-alpha")) {
         float alpha;
         if (!value_to_float(ctx, &alpha))
@@ -2854,6 +2868,9 @@ parse_config_file(FILE *f, struct config *conf, const char *path, bool errors_ar
         errno = 0;
     }
 
+    /* Set `alpha_non_whitespace` to atleast `alpha`. */
+    conf->colors.alpha_non_whitespace = max(conf->colors.alpha_non_whitespace, conf->colors.alpha);
+
     if (errno != 0) {
         LOG_AND_NOTIFY_ERRNO("failed to read from configuration");
         if (errors_are_fatal)
@@ -3092,6 +3109,12 @@ config_load(struct config *conf, const char *conf_path,
             .flash = 0x7f7f00,
             .flash_alpha = 0x7fff,
             .alpha = 0xffff,
+            /* HACK:
+             * when `alpha_non_whitespace` is not set its
+             * default value will be `alpha`. This is achived via
+             * restricting it to be at least the value of `alpha`
+             */
+            .alpha_non_whitespace = 0x0000,
             .selection_fg = 0x80000000,  /* Use default bg */
             .selection_bg = 0x80000000,  /* Use default fg */
             .use_custom = {
