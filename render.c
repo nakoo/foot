@@ -3866,6 +3866,11 @@ tiocswinsz(struct terminal *term)
         {
             LOG_ERRNO("TIOCSWINSZ");
         }
+
+        if (term->size_notifications_chars)
+            term_report_window_size_chars(term);
+        if (term->size_notifications_pixels)
+            term_report_window_size_pixels(term, false);
     }
 }
 

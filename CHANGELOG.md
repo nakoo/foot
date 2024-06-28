@@ -61,6 +61,8 @@
   will now utilize the new single-pixel buffer protocol. This mainly
   reduces the memory usage, but should also be slightly faster.
 * Support for high-res mouse wheel scroll events ([#1738][1738]).
+* Support for private modes 2034 and 2038 ([in-band window resize
+  notifications](https://gist.github.com/rockorager/e695fb2924d36b2bcf1fff4a3704bd83)).
 
 [1707]: https://codeberg.org/dnkl/foot/issues/1707
 [1738]: https://codeberg.org/dnkl/foot/issues/1738

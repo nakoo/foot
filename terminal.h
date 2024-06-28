@@ -479,6 +479,9 @@ struct terminal {
         bool sixel_display_mode:1;
         bool sixel_private_palette:1;
         bool sixel_cursor_right_of_graphics:1;
+
+        bool size_notifications_pixels:1;
+        bool size_notifications_chars:1;
     } xtsave;
 
     bool window_title_has_been_set;
@@ -741,6 +744,9 @@ struct terminal {
     char *cwd;
 
     bool grapheme_shaping;
+
+    bool size_notifications_pixels;  /* Private mode 2034 */
+    bool size_notifications_chars;   /* Private mode 2038 */
 };
 
 struct config;
@@ -859,6 +865,13 @@ bool term_spawn_new(const struct terminal *term);
 
 void term_enable_app_sync_updates(struct terminal *term);
 void term_disable_app_sync_updates(struct terminal *term);
+
+void term_enable_size_notifications_pixels(struct terminal *term);
+void term_disable_size_notifications_pixels(struct terminal *term);
+void term_enable_size_notifications_chars(struct terminal *term);
+void term_disable_size_notifications_chars(struct terminal *term);
+void term_report_window_size_pixels(struct terminal *term, bool include_padding);
+void term_report_window_size_chars(struct terminal *term);
 
 enum term_surface term_surface_kind(
     const struct terminal *term, const struct wl_surface *surface);

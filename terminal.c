@@ -44,6 +44,7 @@
 #include "util.h"
 #include "vt.h"
 #include "xmalloc.h"
+#include "xsnprintf.h"
 
 #define PTMX_TIMING 0
 
@@ -4097,4 +4098,72 @@ term_set_user_mouse_cursor(struct terminal *term, const char *cursor)
         ? xstrdup(cursor)
         : NULL;
     term_xcursor_update(term);
+}
+
+void
+term_enable_size_notifications_pixels(struct terminal *term)
+{
+    if (term->size_notifications_pixels)
+        return;
+
+    term->size_notifications_pixels = true;
+    term_report_window_size_pixels(term, false);
+}
+
+void
+term_disable_size_notifications_pixels(struct terminal *term)
+{
+    if (!term->size_notifications_pixels)
+        return;
+
+    term->size_notifications_chars = false;
+}
+
+void
+term_enable_size_notifications_chars(struct terminal *term)
+{
+    if (term->size_notifications_chars)
+        return;
+
+    term->size_notifications_chars = true;
+    term_report_window_size_chars(term);
+}
+
+void
+term_disable_size_notifications_chars(struct terminal *term)
+{
+    if (!term->size_notifications_chars)
+        return;
+
+    term->size_notifications_chars = false;
+}
+
+void
+term_report_window_size_pixels(struct terminal *term, bool include_padding)
+{
+    int width = -1;
+    int height = -1;
+
+    if (!include_padding) {
+        /* The text area only */
+        width = term->width - term->margins.left - term->margins.right;
+        height = term->height - term->margins.top - term->margins.bottom;
+    } else {
+        /* The entire window, including padding */
+        width = term->width;
+        height = term->height;
+    }
+
+    char reply[64];
+    size_t n = xsnprintf(reply, sizeof(reply), "\033[4;%d;%dt", height, width);
+    term_to_slave(term, reply, n);
+}
+
+void
+term_report_window_size_chars(struct terminal *term)
+{
+    char reply[64];
+    size_t n = xsnprintf(
+        reply, sizeof(reply), "\033[8;%d;%dt", term->rows, term->cols);
+    term_to_slave(term, reply, n);
 }

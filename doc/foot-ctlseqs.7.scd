@@ -331,6 +331,12 @@ that corresponds to one of the following modes:
 |  2027
 :  contour
 :  Grapheme cluster processing
+|  2034
+:  TODO
+:  In-band window resize notifications, in pixels
+|  2038
+:  TODO
+:  In-band window resize notifications, in characters
 |  8452
 :  xterm
 :  Position cursor to the right of sixels, instead of on the next line

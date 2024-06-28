@@ -500,6 +500,20 @@ decset_decrst(struct terminal *term, unsigned param, bool enable)
         term->grapheme_shaping = enable;
         break;
 
+    case 2034:
+        if (enable)
+            term_enable_size_notifications_pixels(term);
+        else
+            term_disable_size_notifications_pixels(term);
+        break;
+
+    case 2038:
+        if (enable)
+            term_enable_size_notifications_chars(term);
+        else
+            term_disable_size_notifications_chars(term);
+        break;
+
     case 8452:
         term->sixel.cursor_right_of_graphics = enable;
         break;
@@ -587,6 +601,8 @@ decrqm(const struct terminal *term, unsigned param)
     case 2027: return term->conf->tweak.grapheme_width_method != GRAPHEME_WIDTH_DOUBLE
         ? DECRPM_PERMANENTLY_RESET
         : decrpm(term->grapheme_shaping);
+    case 2034: return decrpm(term->size_notifications_pixels);
+    case 2038: return decrpm(term->size_notifications_chars);
     case 8452: return decrpm(term->sixel.cursor_right_of_graphics);
     case 737769: return decrpm(term_ime_is_enabled(term));
     }
@@ -631,6 +647,8 @@ xtsave(struct terminal *term, unsigned param)
     case 2004: term->xtsave.bracketed_paste = term->bracketed_paste; break;
     case 2026: term->xtsave.app_sync_updates = term->render.app_sync_updates.enabled; break;
     case 2027: term->xtsave.grapheme_shaping = term->grapheme_shaping; break;
+    case 2034: term->xtsave.size_notifications_pixels = term->size_notifications_pixels; break;
+    case 2038: term->xtsave.size_notifications_chars = term->size_notifications_chars; break;
     case 8452: term->xtsave.sixel_cursor_right_of_graphics = term->sixel.cursor_right_of_graphics; break;
     case 737769: term->xtsave.ime = term_ime_is_enabled(term); break;
     }
@@ -674,6 +692,8 @@ xtrestore(struct terminal *term, unsigned param)
     case 2004: enable = term->xtsave.bracketed_paste; break;
     case 2026: enable = term->xtsave.app_sync_updates; break;
     case 2027: enable = term->xtsave.grapheme_shaping; break;
+    case 2034: enable = term->xtsave.size_notifications_pixels; break;
+    case 2038: enable = term->xtsave.size_notifications_chars; break;
     case 8452: enable = term->xtsave.sixel_cursor_right_of_graphics; break;
     case 737769: enable = term->xtsave.ime; break;
 
@@ -1204,33 +1224,10 @@ csi_dispatch(struct terminal *term, uint8_t final)
                 break;
             }
 
-            case 14: { /* report window size in pixels */
-                int width = -1;
-                int height = -1;
-
+            case 14: { /* report window/text-area size in pixels */
                 switch (vt_param_get(term, 1, 0)) {
-                case 0:
-                    /* text area size */
-                    width = term->width - term->margins.left - term->margins.right;
-                    height = term->height - term->margins.top - term->margins.bottom;
-                    break;
-
-                case 2:
-                    /* window size */
-                    width = term->width;
-                    height = term->height;
-                    break;
-
-                default:
-                    UNHANDLED();
-                    break;
-                }
-
-                if (width >= 0 && height >= 0) {
-                    char reply[64];
-                    size_t n = xsnprintf(
-                        reply, sizeof(reply), "\033[4;%d;%dt", height, width);
-                    term_to_slave(term, reply, n);
+                case 0: term_report_window_size_pixels(term, false); break;
+                case 2: term_report_window_size_pixels(term, true); break;
                 }
                 break;
             }
@@ -1259,10 +1256,7 @@ csi_dispatch(struct terminal *term, uint8_t final)
             }
 
             case 18: { /* text area size in chars */
-                char reply[64];
-                size_t n = xsnprintf(reply, sizeof(reply), "\033[8;%d;%dt",
-                         term->rows, term->cols);
-                term_to_slave(term, reply, n);
+                term_report_window_size_chars(term);
                 break;
             }
 
