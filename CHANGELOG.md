@@ -94,7 +94,7 @@
   `BTN_FORWARD`. The default bindings have been updated, and
   `scrollback-up-mouse`, `scrollback-down-mouse`, `font-increase` and
   `font-decrease` now use the new button names.
-  
+
   This change allow users to separate physical mouse buttons that
   _also_ generates `BTN_BACK` and `BTN_FORWARD`, from wheel scrolling
   ([#1763][1763]).
@@ -130,6 +130,8 @@
 * Wrong color used when drawing the unfocused, hollow cursor.
 * Encoding of `BTN_BACK` and `BTN_FORWARD`, when sending a mouse input
   escape sequence to the terminal application.
+* Replaced the old catppuccin theme with updated flavored themes
+  pulled from [catppuccin/foot](https://github.com/catppuccin/foot)
 
 [1694]: https://codeberg.org/dnkl/foot/issues/1694
 [1717]: https://codeberg.org/dnkl/foot/issues/1717
