@@ -34,6 +34,7 @@
 #include "shm-formats.h"
 #include "util.h"
 #include "xmalloc.h"
+#include "vulkan.h"
 
 static void
 csd_reload_font(struct wl_window *win, float old_scale)
@@ -1086,6 +1087,76 @@ fdm_repeat(struct fdm *fdm, int fd, int events, void *data)
 }
 
 static void
+handle_dmabuf_feedback_done(void *data, struct zwp_linux_dmabuf_feedback_v1 *feedback)
+{
+    LOG_DBG("linux dmabuf feedback done");
+    struct wayland *wayl = data;
+    if (wayl->vk == NULL)
+        wayl->vk = vulkan_create(wayl->preferred_device);
+}
+
+static void
+handle_dmabuf_feedback_format_table(void *data, struct zwp_linux_dmabuf_feedback_v1 *feedback, int fd, uint32_t size)
+{
+    LOG_DBG("linux dmabuf feedback format table");
+    close(fd);
+}
+
+static void
+handle_dmabuf_feedback_main_device(void *data, struct zwp_linux_dmabuf_feedback_v1 *feedback, struct wl_array *device)
+{
+
+	dev_t dev_id;
+	assert(device->size == sizeof(dev_id));
+	memcpy(&dev_id, device->data, sizeof(dev_id));
+
+    struct wayland *wayl = data;
+    wayl->preferred_device = dev_id;
+
+    LOG_DBG("linux dmabuf feedback main device: %ld", dev_id);
+}
+
+static void
+handle_dmabuf_feedback_tranche_done(void *data, struct zwp_linux_dmabuf_feedback_v1 *feedback)
+{
+    LOG_DBG("linux dmabuf feedback tranche done");
+}
+
+static void
+handle_dmabuf_feedback_tranche_target_device(void *data, struct zwp_linux_dmabuf_feedback_v1 *feedback, struct wl_array *device)
+{
+
+	dev_t dev_id;
+	assert(device->size == sizeof(dev_id));
+	memcpy(&dev_id, device->data, sizeof(dev_id));
+
+    LOG_DBG("linux dmabuf feedback tranche target device: %ld", dev_id);
+}
+
+static void
+handle_dmabuf_feedback_tranche_formats(void *data, struct zwp_linux_dmabuf_feedback_v1 *feedback, struct wl_array *indices)
+{
+    LOG_DBG("linux dmabuf feedback tranche formats");
+}
+
+static void
+handle_dmabuf_feedback_tranche_flags(void *data, struct zwp_linux_dmabuf_feedback_v1 *feedback, uint32_t flags)
+{
+    LOG_DBG("linux dmabuf feedback tranche flags: %d", flags);
+}
+
+static const struct zwp_linux_dmabuf_feedback_v1_listener
+		linux_dmabuf_feedback_v1_listener = {
+	.done = handle_dmabuf_feedback_done,
+	.format_table = handle_dmabuf_feedback_format_table,
+	.main_device = handle_dmabuf_feedback_main_device,
+	.tranche_done = handle_dmabuf_feedback_tranche_done,
+	.tranche_target_device = handle_dmabuf_feedback_tranche_target_device,
+	.tranche_formats = handle_dmabuf_feedback_tranche_formats,
+	.tranche_flags = handle_dmabuf_feedback_tranche_flags,
+};
+
+static void
 handle_global(void *data, struct wl_registry *registry,
               uint32_t name, const char *interface, uint32_t version)
 {
@@ -1113,6 +1184,18 @@ handle_global(void *data, struct wl_registry *registry,
 
         wayl->sub_compositor = wl_registry_bind(
             wayl->registry, name, &wl_subcompositor_interface, required);
+    }
+
+    else if (streq(interface, zwp_linux_dmabuf_v1_interface.name)) {
+        const uint32_t required = 4;
+        if (!verify_iface_version(interface, version, required))
+            return;
+
+        wayl->linux_dmabuf = wl_registry_bind(
+                wayl->registry, name, &zwp_linux_dmabuf_v1_interface, required);
+
+        struct zwp_linux_dmabuf_feedback_v1 *feedback = zwp_linux_dmabuf_v1_get_default_feedback(wayl->linux_dmabuf);
+        zwp_linux_dmabuf_feedback_v1_add_listener(feedback, &linux_dmabuf_feedback_v1_listener, wayl);
     }
 
     else if (streq(interface, wl_shm_interface.name)) {
@@ -1679,6 +1762,10 @@ wayl_destroy(struct wayland *wayl)
         zwp_text_input_manager_v3_destroy(wayl->text_input_manager);
 #endif
 
+    if (wayl->vk != NULL)
+        vulkan_destroy(wayl->vk);
+    if (wayl->linux_dmabuf != NULL)
+        zwp_linux_dmabuf_v1_destroy(wayl->linux_dmabuf);
     if (wayl->single_pixel_manager != NULL)
         wp_single_pixel_buffer_manager_v1_destroy(wayl->single_pixel_manager);
     if (wayl->fractional_scale_manager != NULL)

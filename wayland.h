@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <uchar.h>
+#include <sys/types.h>
 
 #include <wayland-client.h>
 #include <xkbcommon/xkbcommon.h>
@@ -19,6 +20,7 @@
 #include <xdg-decoration-unstable-v1.h>
 #include <xdg-output-unstable-v1.h>
 #include <xdg-shell.h>
+#include <linux-dmabuf-v1.h>
 
 #include <fcft/fcft.h>
 #include <tllist.h>
@@ -425,6 +427,7 @@ struct wayland {
     struct wl_compositor *compositor;
     struct wl_subcompositor *sub_compositor;
     struct wl_shm *shm;
+    struct zwp_linux_dmabuf_v1 *linux_dmabuf;
 
     struct zxdg_output_manager_v1 *xdg_output_manager;
 
@@ -458,6 +461,9 @@ struct wayland {
 
     /* WL_SHM >= 2 */
     bool use_shm_release;
+
+    struct vulkan *vk;
+    dev_t preferred_device;
 };
 
 struct wayland *wayl_init(
