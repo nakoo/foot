@@ -637,13 +637,13 @@ struct terminal {
 
     struct {
         struct {
-            struct buffer_chain *grid;
-            struct buffer_chain *search;
-            struct buffer_chain *scrollback_indicator;
-            struct buffer_chain *render_timer;
-            struct buffer_chain *url;
-            struct buffer_chain *csd;
-            struct buffer_chain *overlay;
+            struct vk_buffer_chain *grid;
+            struct vk_buffer_chain *search;
+            struct vk_buffer_chain *scrollback_indicator;
+            struct vk_buffer_chain *render_timer;
+            struct vk_buffer_chain *url;
+            struct vk_buffer_chain *csd;
+            struct vk_buffer_chain *overlay;
         } chains;
 
         /* Scheduled for rendering, as soon-as-possible */
@@ -690,7 +690,7 @@ struct terminal {
             mtx_t lock;
             tll(int) queue;
             thrd_t *threads;
-            struct buffer *buf;
+            struct vk_buffer *buf;
         } workers;
 
         /* Last rendered cursor position */
@@ -700,10 +700,10 @@ struct terminal {
             bool hidden;
         } last_cursor;
 
-        struct buffer *last_buf;     /* Buffer we rendered to last time */
+        struct vk_buffer *last_buf;  /* Buffer we rendered to last time */
 
         enum overlay_style last_overlay_style;
-        struct buffer *last_overlay_buf;
+        struct vk_buffer *last_overlay_buf;
         pixman_region32_t last_overlay_clip;
 
         size_t search_glyph_offset;

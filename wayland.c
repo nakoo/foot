@@ -97,7 +97,7 @@ csd_destroy(struct wl_window *win)
 
     for (size_t i = 0; i < ALEN(win->csd.surface); i++)
         wayl_win_subsurface_destroy(&win->csd.surface[i]);
-    shm_purge(term->render.chains.csd);
+    vk_purge(term->render.chains.csd);
 }
 
 static void
@@ -2011,12 +2011,12 @@ wayl_win_destroy(struct wl_window *win)
     wayl_win_subsurface_destroy(&win->render_timer);
     wayl_win_subsurface_destroy(&win->overlay);
 
-    shm_purge(term->render.chains.search);
-    shm_purge(term->render.chains.scrollback_indicator);
-    shm_purge(term->render.chains.render_timer);
-    shm_purge(term->render.chains.grid);
-    shm_purge(term->render.chains.url);
-    shm_purge(term->render.chains.csd);
+    vk_purge(term->render.chains.search);
+    vk_purge(term->render.chains.scrollback_indicator);
+    vk_purge(term->render.chains.render_timer);
+    vk_purge(term->render.chains.grid);
+    vk_purge(term->render.chains.url);
+    vk_purge(term->render.chains.csd);
 
     tll_foreach(win->xdg_tokens, it) {
         xdg_activation_token_v1_destroy(it->item->xdg_token);
@@ -2235,14 +2235,14 @@ wayl_surface_scale_explicit_width_height(
 
 void
 wayl_surface_scale(const struct wl_window *win, const struct wayl_surface *surf,
-                   const struct buffer *buf, float scale)
+                   const struct vk_buffer *buf, float scale)
 {
     surface_scale_explicit_width_height(
         win, surf, buf->width, buf->height, scale, true);
 }
 
 void
-wayl_win_scale(struct wl_window *win, const struct buffer *buf)
+wayl_win_scale(struct wl_window *win, const struct vk_buffer *buf)
 {
     const struct terminal *term = win->term;
     const float scale = term->scale;

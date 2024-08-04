@@ -45,6 +45,7 @@
 #include "vt.h"
 #include "xmalloc.h"
 #include "xsnprintf.h"
+#include "vulkan.h"
 
 #define PTMX_TIMING 0
 
@@ -1269,13 +1270,13 @@ term_init(const struct config *conf, struct fdm *fdm, struct reaper *reaper,
         .wl = wayl,
         .render = {
             .chains = {
-                .grid = shm_chain_new(wayl->shm, true, 1 + conf->render_worker_count),
-                .search = shm_chain_new(wayl->shm, false, 1),
-                .scrollback_indicator = shm_chain_new(wayl->shm, false, 1),
-                .render_timer = shm_chain_new(wayl->shm, false, 1),
-                .url = shm_chain_new(wayl->shm, false, 1),
-                .csd = shm_chain_new(wayl->shm, false, 1),
-                .overlay = shm_chain_new(wayl->shm, false, 1),
+                .grid = vk_chain_new(wayl->vk, wayl->linux_dmabuf, true, 1 + conf->render_worker_count),
+                .search = vk_chain_new(wayl->vk, wayl->linux_dmabuf, false, 1),
+                .scrollback_indicator = vk_chain_new(wayl->vk, wayl->linux_dmabuf, false, 1),
+                .render_timer = vk_chain_new(wayl->vk, wayl->linux_dmabuf, false, 1),
+                .url = vk_chain_new(wayl->vk, wayl->linux_dmabuf, false, 1),
+                .csd = vk_chain_new(wayl->vk, wayl->linux_dmabuf, false, 1),
+                .overlay = vk_chain_new(wayl->vk, wayl->linux_dmabuf, false, 1),
             },
             .scrollback_lines = conf->scrollback.lines,
             .app_sync_updates.timer_fd = app_sync_updates_fd,
@@ -1798,14 +1799,14 @@ term_destroy(struct terminal *term)
     xassert(tll_length(term->render.workers.queue) == 0);
     tll_free(term->render.workers.queue);
 
-    shm_unref(term->render.last_buf);
-    shm_chain_free(term->render.chains.grid);
-    shm_chain_free(term->render.chains.search);
-    shm_chain_free(term->render.chains.scrollback_indicator);
-    shm_chain_free(term->render.chains.render_timer);
-    shm_chain_free(term->render.chains.url);
-    shm_chain_free(term->render.chains.csd);
-    shm_chain_free(term->render.chains.overlay);
+    vk_unref(term->render.last_buf);
+    vk_chain_free(term->render.chains.grid);
+    vk_chain_free(term->render.chains.search);
+    vk_chain_free(term->render.chains.scrollback_indicator);
+    vk_chain_free(term->render.chains.render_timer);
+    vk_chain_free(term->render.chains.url);
+    vk_chain_free(term->render.chains.csd);
+    vk_chain_free(term->render.chains.overlay);
     pixman_region32_fini(&term->render.last_overlay_clip);
 
     tll_free(term->tab_stops);

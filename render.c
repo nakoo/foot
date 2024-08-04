@@ -43,6 +43,7 @@
 #include "url-mode.h"
 #include "util.h"
 #include "xmalloc.h"
+#include "vulkan.h"
 
 #define TIME_SCROLL_DAMAGE 0
 
@@ -1085,7 +1086,7 @@ render_row(struct terminal *term, pixman_image_t *pix, pixman_region32_t *damage
 }
 
 static void
-render_urgency(struct terminal *term, struct buffer *buf)
+render_urgency(struct terminal *term, struct vk_buffer *buf)
 {
     uint32_t red = term->colors.table[1];
     pixman_color_t bg = color_hex_to_pixman(red);
@@ -1111,7 +1112,7 @@ render_urgency(struct terminal *term, struct buffer *buf)
 }
 
 static void
-render_margin(struct terminal *term, struct buffer *buf,
+render_margin(struct terminal *term, struct vk_buffer *buf,
               int start_line, int end_line, bool apply_damage)
 {
     /* Fill area outside the cell grid with the default background color */
@@ -1186,7 +1187,7 @@ render_margin(struct terminal *term, struct buffer *buf,
 }
 
 static void
-grid_render_scroll(struct terminal *term, struct buffer *buf,
+grid_render_scroll(struct terminal *term, struct vk_buffer *buf,
                    const struct damage *dmg)
 {
     LOG_DBG(
@@ -1245,7 +1246,7 @@ grid_render_scroll(struct terminal *term, struct buffer *buf,
      * SHM. Otherwise use memmove.
      */
     bool try_shm_scroll =
-        shm_can_scroll(buf) && (
+        vk_can_scroll(buf) && (
             dmg->lines +
             dmg->region.start +
             (term->rows - dmg->region.end)) < term->rows / 2;
@@ -1256,7 +1257,7 @@ grid_render_scroll(struct terminal *term, struct buffer *buf,
     //try_shm_scroll = true;
 
     if (try_shm_scroll) {
-        did_shm_scroll = shm_scroll(
+        did_shm_scroll = vk_scroll(
             buf, dmg->lines * term->cell_height,
             term->margins.top, dmg->region.start * term->cell_height,
             term->margins.bottom, (term->rows - dmg->region.end) * term->cell_height);
@@ -1299,7 +1300,7 @@ grid_render_scroll(struct terminal *term, struct buffer *buf,
 }
 
 static void
-grid_render_scroll_reverse(struct terminal *term, struct buffer *buf,
+grid_render_scroll_reverse(struct terminal *term, struct vk_buffer *buf,
                            const struct damage *dmg)
 {
     LOG_DBG(
@@ -1325,7 +1326,7 @@ grid_render_scroll_reverse(struct terminal *term, struct buffer *buf,
     int dst_y = term->margins.top + (dmg->region.start + dmg->lines) * term->cell_height;
 
     bool try_shm_scroll =
-        shm_can_scroll(buf) && (
+        vk_can_scroll(buf) && (
             dmg->lines +
             dmg->region.start +
             (term->rows - dmg->region.end)) < term->rows / 2;
@@ -1333,7 +1334,7 @@ grid_render_scroll_reverse(struct terminal *term, struct buffer *buf,
     bool did_shm_scroll = false;
 
     if (try_shm_scroll) {
-        did_shm_scroll = shm_scroll(
+        did_shm_scroll = vk_scroll(
             buf, -dmg->lines * term->cell_height,
             term->margins.top, dmg->region.start * term->cell_height,
             term->margins.bottom, (term->rows - dmg->region.end) * term->cell_height);
@@ -1597,7 +1598,7 @@ render_sixel_images(struct terminal *term, pixman_image_t *pix,
 #if defined(FOOT_IME_ENABLED) && FOOT_IME_ENABLED
 static void
 render_ime_preedit_for_seat(struct terminal *term, struct seat *seat,
-                            struct buffer *buf)
+                            struct vk_buffer *buf)
 {
     if (likely(seat->ime.preedit.cells == NULL))
         return;
@@ -1755,7 +1756,7 @@ render_ime_preedit_for_seat(struct terminal *term, struct seat *seat,
 #endif
 
 static void
-render_ime_preedit(struct terminal *term, struct buffer *buf)
+render_ime_preedit(struct terminal *term, struct vk_buffer *buf)
 {
 #if defined(FOOT_IME_ENABLED) && FOOT_IME_ENABLED
     tll_foreach(term->wl->seats, it) {
@@ -1890,7 +1891,7 @@ render_overlay(struct terminal *term)
         return;
     }
 
-    struct buffer *buf = shm_get_buffer(
+    struct vk_buffer *buf = vk_get_buffer(
         term->render.chains.overlay, term->width, term->height, true);
     pixman_image_set_clip_region32(buf->pix[0], NULL);
 
@@ -2017,7 +2018,7 @@ render_overlay(struct terminal *term)
              style == term->render.last_overlay_style)
     {
         xassert(style == OVERLAY_FLASH || style == OVERLAY_UNICODE_MODE);
-        shm_did_not_use_buf(buf);
+        vk_did_not_use_buf(buf);
         return;
     } else {
         pixman_image_set_clip_region32(buf->pix[0], NULL);
@@ -2073,7 +2074,7 @@ render_worker_thread(void *_ctx)
     while (true) {
         sem_wait(start);
 
-        struct buffer *buf = term->render.workers.buf;
+        struct vk_buffer *buf = term->render.workers.buf;
         bool frame_done = false;
 
         /* Translate offset-relative cursor row to view-relative */
@@ -2184,7 +2185,7 @@ get_csd_data(const struct terminal *term, enum csd_surface surf_idx)
 }
 
 static void
-csd_commit(struct terminal *term, struct wayl_surface *surf, struct buffer *buf)
+csd_commit(struct terminal *term, struct wayl_surface *surf, struct vk_buffer *buf)
 {
     wayl_surface_scale(term->window, surf, buf, term->scale);
     wl_surface_attach(surf->surf, buf->wl_buf, 0, 0);
@@ -2194,7 +2195,7 @@ csd_commit(struct terminal *term, struct wayl_surface *surf, struct buffer *buf)
 
 static void
 render_csd_part(struct terminal *term,
-                struct wl_surface *surf, struct buffer *buf,
+                struct wl_surface *surf, struct vk_buffer *buf,
                 int width, int height, pixman_color_t *color)
 {
     xassert(term->window->csd_mode == CSD_YES);
@@ -2206,7 +2207,7 @@ render_csd_part(struct terminal *term,
 
 static void
 render_osd(struct terminal *term, const struct wayl_sub_surface *sub_surf,
-           struct fcft_font *font, struct buffer *buf,
+           struct fcft_font *font, struct vk_buffer *buf,
            const char32_t *text, uint32_t _fg, uint32_t _bg,
            unsigned x)
 {
@@ -2308,7 +2309,7 @@ render_osd(struct terminal *term, const struct wayl_sub_surface *sub_surf,
 
 static void
 render_csd_title(struct terminal *term, const struct csd_data *info,
-                 struct buffer *buf)
+                 struct vk_buffer *buf)
 {
     xassert(term->window->csd_mode == CSD_YES);
 
@@ -2345,7 +2346,7 @@ render_csd_title(struct terminal *term, const struct csd_data *info,
 
 static void
 render_csd_border(struct terminal *term, enum csd_surface surf_idx,
-                  const struct csd_data *info, struct buffer *buf)
+                  const struct csd_data *info, struct vk_buffer *buf)
 {
     xassert(term->window->csd_mode == CSD_YES);
     xassert(surf_idx >= CSD_SURF_LEFT && surf_idx <= CSD_SURF_BOTTOM);
@@ -2442,7 +2443,7 @@ get_csd_button_fg_color(const struct config *conf)
 }
 
 static void
-render_csd_button_minimize(struct terminal *term, struct buffer *buf)
+render_csd_button_minimize(struct terminal *term, struct vk_buffer *buf)
 {
     pixman_color_t color = get_csd_button_fg_color(term->conf);
     pixman_image_t *src = pixman_image_create_solid_fill(&color);
@@ -2470,7 +2471,7 @@ render_csd_button_minimize(struct terminal *term, struct buffer *buf)
 
 static void
 render_csd_button_maximize_maximized(
-    struct terminal *term, struct buffer *buf)
+    struct terminal *term, struct vk_buffer *buf)
 {
     pixman_color_t color = get_csd_button_fg_color(term->conf);
     pixman_image_t *src = pixman_image_create_solid_fill(&color);
@@ -2502,7 +2503,7 @@ render_csd_button_maximize_maximized(
 
 static void
 render_csd_button_maximize_window(
-    struct terminal *term, struct buffer *buf)
+    struct terminal *term, struct vk_buffer *buf)
 {
     pixman_color_t color = get_csd_button_fg_color(term->conf);
     pixman_image_t *src = pixman_image_create_solid_fill(&color);
@@ -2533,7 +2534,7 @@ render_csd_button_maximize_window(
 }
 
 static void
-render_csd_button_maximize(struct terminal *term, struct buffer *buf)
+render_csd_button_maximize(struct terminal *term, struct vk_buffer *buf)
 {
     if (term->window->is_maximized)
         render_csd_button_maximize_maximized(term, buf);
@@ -2542,7 +2543,7 @@ render_csd_button_maximize(struct terminal *term, struct buffer *buf)
 }
 
 static void
-render_csd_button_close(struct terminal *term, struct buffer *buf)
+render_csd_button_close(struct terminal *term, struct vk_buffer *buf)
 {
     pixman_color_t color = get_csd_button_fg_color(term->conf);
     pixman_image_t *src = pixman_image_create_solid_fill(&color);
@@ -2630,7 +2631,7 @@ render_csd_button_close(struct terminal *term, struct buffer *buf)
 
 static void
 render_csd_button(struct terminal *term, enum csd_surface surf_idx,
-                  const struct csd_data *info, struct buffer *buf)
+                  const struct csd_data *info, struct vk_buffer *buf)
 {
     xassert(term->window->csd_mode == CSD_YES);
     xassert(surf_idx >= CSD_SURF_MINIMIZE && surf_idx <= CSD_SURF_CLOSE);
@@ -2742,8 +2743,8 @@ render_csd(struct terminal *term)
         wl_subsurface_set_position(sub, roundf(x / scale), roundf(y / scale));
     }
 
-    struct buffer *bufs[CSD_SURF_COUNT];
-    shm_get_many(term->render.chains.csd, CSD_SURF_COUNT, widths, heights, bufs, true);
+    struct vk_buffer *bufs[CSD_SURF_COUNT];
+    vk_get_many(term->render.chains.csd, CSD_SURF_COUNT, widths, heights, bufs, true);
 
     for (size_t i = CSD_SURF_LEFT; i <= CSD_SURF_BOTTOM; i++)
         render_csd_border(term, i, &infos[i], bufs[i]);
@@ -2887,8 +2888,8 @@ render_scrollback_position(struct terminal *term)
         return;
     }
 
-    struct buffer_chain *chain = term->render.chains.scrollback_indicator;
-    struct buffer *buf = shm_get_buffer(chain, width, height, false);
+    struct vk_buffer_chain *chain = term->render.chains.scrollback_indicator;
+    struct vk_buffer *buf = vk_get_buffer(chain, width, height, false);
 
     wl_subsurface_set_position(
         win->scrollback_indicator.sub, roundf(x / scale), roundf(y / scale));
@@ -2930,8 +2931,8 @@ render_render_timer(struct terminal *term, struct timespec render_time)
     width = roundf(scale * ceilf(width / scale));
     height = roundf(scale * ceilf(height / scale));
 
-    struct buffer_chain *chain = term->render.chains.render_timer;
-    struct buffer *buf = shm_get_buffer(chain, width, height, false);
+    struct vk_buffer_chain *chain = term->render.chains.render_timer;
+    struct vk_buffer *buf = vk_get_buffer(chain, width, height, false);
 
     wl_subsurface_set_position(
         win->render_timer.sub,
@@ -2954,7 +2955,7 @@ static const struct wl_callback_listener frame_listener = {
 };
 
 static void
-force_full_repaint(struct terminal *term, struct buffer *buf)
+force_full_repaint(struct terminal *term, struct vk_buffer *buf)
 {
     tll_free(term->grid->scroll_damage);
     render_margin(term, buf, 0, term->rows, true);
@@ -2962,7 +2963,7 @@ force_full_repaint(struct terminal *term, struct buffer *buf)
 }
 
 static void
-reapply_old_damage(struct terminal *term, struct buffer *new, struct buffer *old)
+reapply_old_damage(struct terminal *term, struct vk_buffer *new, struct vk_buffer *old)
 {
     static int counter = 0;
     static bool have_warned = false;
@@ -3105,10 +3106,10 @@ grid_render(struct terminal *term)
     xassert(term->width > 0);
     xassert(term->height > 0);
 
-    struct buffer_chain *chain = term->render.chains.grid;
+    struct vk_buffer_chain *chain = term->render.chains.grid;
     bool use_alpha = !term->window->is_fullscreen &&
                      term->colors.alpha != 0xffff;
-    struct buffer *buf = shm_get_buffer(
+    struct vk_buffer *buf = vk_get_buffer(
         chain, term->width, term->height, use_alpha);
 
     /* Dirty old and current cursor cell, to ensure they're repainted */
@@ -3137,12 +3138,12 @@ grid_render(struct terminal *term)
     }
 
     if (term->render.last_buf != NULL) {
-        shm_unref(term->render.last_buf);
+        vk_unref(term->render.last_buf);
         term->render.last_buf = NULL;
     }
 
     term->render.last_buf = buf;
-    shm_addref(buf);
+    vk_addref(buf);
     buf->age = 0;
 
 
@@ -3499,8 +3500,8 @@ render_search_box(struct terminal *term)
     const size_t visible_cells = (visible_width - 2 * margin) / term->cell_width;
     size_t glyph_offset = term->render.search_glyph_offset;
 
-    struct buffer_chain *chain = term->render.chains.search;
-    struct buffer *buf = shm_get_buffer(chain, width, height, true);
+    struct vk_buffer_chain *chain = term->render.chains.search;
+    struct vk_buffer *buf = vk_get_buffer(chain, width, height, true);
 
     pixman_region32_t clip;
     pixman_region32_init_rect(&clip, 0, 0, width, height);
@@ -3960,9 +3961,9 @@ render_urls(struct terminal *term)
         render_count++;
     }
 
-    struct buffer_chain *chain = term->render.chains.url;
-    struct buffer *bufs[render_count];
-    shm_get_many(chain, render_count, widths, heights, bufs, false);
+    struct vk_buffer_chain *chain = term->render.chains.url;
+    struct vk_buffer *bufs[render_count];
+    vk_get_many(chain, render_count, widths, heights, bufs, false);
 
     uint32_t fg = term->conf->colors.use_custom.jump_label
         ? term->conf->colors.jump_label.fg
@@ -4114,7 +4115,7 @@ delayed_reflow_of_normal_grid(struct terminal *term)
     term->interactive_resizing.old_hide_cursor = false;
 
     /* Invalidate render pointers */
-    shm_unref(term->render.last_buf);
+    vk_unref(term->render.last_buf);
     term->render.last_buf = NULL;
     term->render.last_cursor.row = NULL;
 
@@ -4633,7 +4634,7 @@ damage_view:
     tll_free(term->normal.scroll_damage);
     tll_free(term->alt.scroll_damage);
 
-    shm_unref(term->render.last_buf);
+    vk_unref(term->render.last_buf);
     term->render.last_buf = NULL;
     term_damage_view(term);
     render_refresh_csd(term);
