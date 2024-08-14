@@ -819,11 +819,15 @@ term_set_fonts(struct terminal *term, struct fcft_font *fonts[static 4],
      * render_resize() after this function */
     if (resize_grid) {
         /* Use force, since cell-width/height may have changed */
+        enum resize_options resize_opts = RESIZE_FORCE;
+        if (conf->resize_keep_grid)
+            resize_opts |= RESIZE_KEEP_GRID;
+
         render_resize(
             term,
             (int)roundf(term->width / term->scale),
             (int)roundf(term->height / term->scale),
-            RESIZE_FORCE | RESIZE_KEEP_GRID);
+            resize_opts);
     }
     return true;
 }

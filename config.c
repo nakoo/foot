@@ -931,6 +931,9 @@ parse_section_main(struct context *ctx)
     else if (streq(key, "resize-by-cells"))
         return value_to_bool(ctx, &conf->resize_by_cells);
 
+    else if (streq(key, "resize-keep-grid"))
+        return value_to_bool(ctx, &conf->resize_keep_grid);
+
     else if (streq(key, "bold-text-in-bright")) {
         if (streq(value, "palette-based")) {
             conf->bold_in_bright.enabled = true;
@@ -3101,6 +3104,7 @@ config_load(struct config *conf, const char *conf_path,
         .pad_x = 0,
         .pad_y = 0,
         .resize_by_cells = true,
+        .resize_keep_grid = true,
         .resize_delay_ms = 100,
         .bold_in_bright = {
             .enabled = false,

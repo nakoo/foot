@@ -140,6 +140,7 @@ struct config {
     bool center;
 
     bool resize_by_cells;
+    bool resize_keep_grid;
 
     uint16_t resize_delay_ms;
 

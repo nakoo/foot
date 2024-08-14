@@ -287,6 +287,18 @@ empty string to be set, but it must be quoted: *KEY=""*)
 
 	Default: _yes_
 
+*resize-keep-grid*
+	Boolean.
+
+	When set to *yes*, the window size will be adjusted with changes in font
+	size to preserve the dimensions of the text grid. When set to *no*, the
+	window size will remain constant and the text grid will be adjusted as
+	necessary to fit the window.
+
+	This option only applies to floating windows.
+
+	Default: _yes_
+
 *initial-window-size-pixels*
 	Initial window width and height in _pixels_ (subject to output
 	scaling), in the form _WIDTHxHEIGHT_. The height _includes_ the
