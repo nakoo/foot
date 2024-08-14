@@ -57,6 +57,11 @@
 ## Unreleased
 ### Added
 ### Changed
+
+* `cursor.unfocused-style` is now effective even when `cursor.style`
+  is not `block`.
+
+
 ### Deprecated
 ### Removed
 ### Fixed

@@ -591,22 +591,22 @@ draw_cursor(const struct terminal *term, const struct cell *cell,
     pixman_color_t text_color;
     cursor_colors_for_cell(term, cell, fg, bg, &cursor_color, &text_color);
 
+    if (unlikely(!term->kbd_focus)) {
+        switch (term->conf->cursor.unfocused_style) {
+        case CURSOR_UNFOCUSED_UNCHANGED:
+            break;
+
+        case CURSOR_UNFOCUSED_HOLLOW:
+            draw_hollow_block(term, pix, &cursor_color, x, y, cols);
+            return;
+
+        case CURSOR_UNFOCUSED_NONE:
+            return;
+        }
+    }
+
     switch (term->cursor_style) {
     case CURSOR_BLOCK:
-        if (unlikely(!term->kbd_focus)) {
-            switch (term->conf->cursor.unfocused_style) {
-            case CURSOR_UNFOCUSED_UNCHANGED:
-                break;
-
-            case CURSOR_UNFOCUSED_HOLLOW:
-                draw_hollow_block(term, pix, &cursor_color, x, y, cols);
-                return;
-
-            case CURSOR_UNFOCUSED_NONE:
-                return;
-            }
-        }
-
         if (likely(term->cursor_blink.state == CURSOR_BLINK_ON) ||
             !term->kbd_focus)
         {
