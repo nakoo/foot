@@ -1020,6 +1020,9 @@ parse_section_main(struct context *ctx)
     else if (streq(key, "underline-thickness"))
         return value_to_pt_or_px(ctx, &conf->underline_thickness);
 
+    else if (streq(key, "strikeout-thickness"))
+        return value_to_pt_or_px(ctx, &conf->strikeout_thickness);
+
     else if (streq(key, "dpi-aware"))
         return value_to_bool(ctx, &conf->dpi_aware);
 
@@ -3117,6 +3120,7 @@ config_load(struct config *conf, const char *conf_path,
         .use_custom_underline_offset = false,
         .box_drawings_uses_font_glyphs = false,
         .underline_thickness = {.pt = 0., .px = -1},
+        .strikeout_thickness = {.pt = 0., .px = -1},
         .dpi_aware = false,
         .bell = {
             .urgent = false,

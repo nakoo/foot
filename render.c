@@ -544,11 +544,21 @@ draw_strikeout(const struct terminal *term, pixman_image_t *pix,
                const struct fcft_font *font,
                const pixman_color_t *color, int x, int y, int cols)
 {
+    const int thickness = term->conf->strikeout_thickness.px >= 0
+        ? term_pt_or_px_as_pixels(
+            term, &term->conf->strikeout_thickness)
+        : font->strikeout.thickness;
+
+    /* Try to center custom strikeout */
+    const int position = term->conf->strikeout_thickness.px >= 0
+        ? font->strikeout.position - round(font->strikeout.thickness / 2.) + round(thickness / 2.)
+        : font->strikeout.position;
+
     pixman_image_fill_rectangles(
         PIXMAN_OP_SRC, pix, color,
         1, &(pixman_rectangle16_t){
-            x, y + term->font_baseline - font->strikeout.position,
-            cols * term->cell_width, font->strikeout.thickness});
+            x, y + term->font_baseline - position,
+            cols * term->cell_width, thickness});
 }
 
 static void

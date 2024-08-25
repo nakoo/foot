@@ -179,6 +179,18 @@ empty string to be set, but it must be quoted: *KEY=""*)
 
 	Default: _unset_
 
+*strikeout-thickness*
+	Use a custom thickness (height) for strikeouts. The thickness is, by
+	default, in _points_.
+
+	To specify a thickness in _pixels_, append *px*:
+	*strikeout-thickness=1px*.
+
+	If left unset (the default), the thickness specified in the font is
+	used.
+
+	Default: _unset_
+
 *box-drawings-uses-font-glyphs*
 	Boolean. When disabled, foot generates box/line drawing characters
 	itself. The are several advantages to doing this instead of using
